@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>متجر الطلاب | سوق مقايضة الكتب والأغراض الجامعية</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="متجر الطلاب | سوق مقايضة الكتب والأغراض الجامعية">
+  <meta property="og:description" content="منصة مجانية وبسيطة لمقايضة الكتب الدراسية والأدوات الجامعية بين طلاب الجامعات">
+  <meta property="og:image" content="">
+  <meta property="og:url" content="">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- الهيدر -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon">🎓</span>
+        <span>متجر الطلاب</span>
+      </a>
+      <div class="navbar-actions">
+        <button id="themeToggleBtn" class="btn-icon" title="تبديل المظهر">🌙</button>
+        <button id="myAdsBtn" class="btn btn-ghost">📋 إعلاناتي</button>
+        <button id="openSupportBtn" class="btn btn-support">💛 ادعم المطور</button>
+        <button id="openFormBtn" class="btn btn-primary">+ أضف غرضك</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- قسم ترحيبي بسيط -->
+  <section class="hero" id="heroSection">
+    <h1>بادل كتبك وأغراضك مع طلاب جامعتك</h1>
+    <p>منصة مجانية وبسيطة لعرض الكتب الدراسية والأدوات الجامعية للمقايضة بدل الشراء</p>
+    <div id="statsCounter" class="stats-counter" style="display:none;"></div>
+  </section>
+
+  <!-- الصفحة الرئيسية: الفلاتر + الشبكة -->
+  <main class="container">
+    <div id="homeView">
+      <div class="filters-bar">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 ابحث عن غرض (كتاب، اسم مادة...)">
+        <div class="filters-row">
+          <select id="filterGovernorate">
+            <option value="">📍 كل المحافظات</option>
+          </select>
+          <select id="filterUniversity">
+            <option value="">🎓 كل الجامعات</option>
+          </select>
+          <select id="filterCategory">
+            <option value="">🏷️ كل التصنيفات</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="itemsCount" class="items-count"></div>
+      <div id="itemsGrid" class="grid"></div>
+      <div id="emptyState" class="empty-state" style="display:none;"></div>
+    </div>
+
+    <!-- صفحة تفاصيل غرض واحد (تظهر بدل الصفحة الرئيسية عند فتح رابط /item/:id) -->
+    <div id="itemDetailView" class="item-detail" style="display:none;"></div>
+  </main>
+
+  <!-- نافذة نموذج إضافة غرض -->
+  <div id="formOverlay" class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>إضافة غرض جديد للمقايضة</h2>
+        <button id="closeFormBtn" class="btn-close">✕</button>
+      </div>
+
+      <form id="itemForm" class="item-form">
+        <label>
+          التصنيف
+          <select name="category" id="categorySelect" required>
+            <option value="" disabled selected>اختر تصنيف الغرض</option>
+          </select>
+        </label>
+
+        <div id="riskyCategoryWarning" class="risky-warning" style="display:none;">
+          ⚠️ احذر عمليات النصب: لا تشارك بيانات استرجاع الحساب (الإيميل/كلمة المرور الأصلية) قبل التأكد من الطرف الآخر، وفضّل تسليم بيانات الدخول فقط بعد اتفاق واضح.
+        </div>
+
+        <label id="universityField" style="display:none;">
+          الجامعة
+          <select name="university" id="universitySelect">
+            <option value="" disabled selected>اختر جامعتك</option>
+          </select>
+        </label>
+
+        <label id="gameTypeField" style="display:none;">
+          نوع اللعبة
+          <select name="gameType" id="gameTypeSelect">
+            <option value="" disabled selected>اختر اللعبة</option>
+          </select>
+        </label>
+
+        <label>
+          المحافظة
+          <select name="governorate" id="governorateSelect" required>
+            <option value="" disabled selected>اختر المحافظة</option>
+          </select>
+        </label>
+
+        <label>
+          المنطقة
+          <select name="area" id="areaSelect" required disabled>
+            <option value="" disabled selected>اختر المحافظة أولاً</option>
+          </select>
+        </label>
+
+        <label>
+          اسم الغرض
+          <input type="text" name="name" placeholder="مثال: كتاب مبادئ الاقتصاد" required>
+        </label>
+
+        <label>
+          الوصف
+          <textarea name="description" rows="3" placeholder="اكتب وصفاً مختصراً عن حالة الغرض وتفاصيله" required></textarea>
+        </label>
+
+        <label>
+          ماذا تريد بدلاً منه؟
+          <input type="text" name="lookingFor" placeholder="مثال: كتاب المحاسبة المالية 1" required>
+        </label>
+
+        <label>
+          رقم الواتساب (مع رمز الدولة)
+          <input type="tel" name="whatsapp" placeholder="مثال: 9627xxxxxxxx" required>
+        </label>
+
+        <label>
+          صور الغرض (حتى 4 صور)
+          <input type="file" name="images" accept="image/*" multiple required>
+        </label>
+
+        <div id="formError" class="form-error"></div>
+
+        <button type="submit" class="btn btn-primary btn-block">نشر الإعلان</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- نافذة دعم المطور -->
+  <div id="supportOverlay" class="overlay">
+    <div class="modal support-modal">
+      <div class="modal-header">
+        <h2>ادعم المطور 💛</h2>
+        <button id="closeSupportBtn" class="btn-close">✕</button>
+      </div>
+      <p class="support-text">
+        إذا أعجبك التطبيق واستفدت منه، يسعدني دعمك البسيط لتطوير المزيد من المشاريع المفيدة للطلاب 🙏
+      </p>
+      <div class="support-wallet">
+        <span class="support-label">محفظة أورانج موني:</span>
+        <div class="support-number-row">
+          <span id="walletNumber" class="support-number">962771587863</span>
+          <button id="copyWalletBtn" class="btn btn-small">نسخ</button>
+        </div>
+      </div>
+      <p class="support-thanks">شكراً جزيلاً لدعمك، كل مساهمة — مهما كانت بسيطة — تعني لي الكثير ❤️</p>
+      <p class="developer-credit">صُمم وطُوّر بواسطة Loay Ayasrah</p>
+    </div>
+  </div>
+
+  <!-- نافذة عن المنصة -->
+  <div id="aboutOverlay" class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>عن متجر الطلاب 🎓</h2>
+        <button id="closeAboutBtn" class="btn-close">✕</button>
+      </div>
+      <p class="support-text">
+        متجر الطلاب منصة مجانية وغير ربحية تساعد طلاب الجامعات على مقايضة الكتب الدراسية والأدوات الجامعية
+        بدل شرائها من جديد كل فصل. اعرض ما لا تحتاجه، وابحث عمّا تحتاجه، وتواصل مباشرة عبر واتساب — بكل بساطة.
+      </p>
+      <p class="support-text">
+        شارك رابط أي إعلان مع أصدقائك، أو انشر أغراضك ليستفيد منها طالب آخر بدل أن تبقى مهملة.
+      </p>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>متجر الطلاب © 2026 — منصة مقايضة غير ربحية بين الطلاب</p>
+    <p class="developer-credit">تطوير: Loay Ayasrah</p>
+    <div class="footer-links">
+      <button id="openAboutBtn" class="link-btn">عن المنصة</button>
+      <a id="developerWhatsappLink" class="link-btn" target="_blank" rel="noopener" href="#">📞 تواصل معنا</a>
+      <button id="openSupportBtnFooter" class="link-btn">💛 ادعم المطور</button>
+    </div>
+  </footer>
+
+  <!-- نافذة ترحيب لأول زيارة -->
+  <div id="welcomeOverlay" class="overlay">
+    <div class="modal welcome-modal">
+      <span class="welcome-emoji">🎓👋</span>
+      <h2 class="welcome-title">أهلاً فيك بمتجر الطلاب!</h2>
+      <p class="support-text" style="text-align:center;">
+        بادل كتبك الدراسية وأغراضك الجامعية مع طلاب من جامعتك بدل ما تشتريها من جديد كل فصل.
+        اعرض، ابحث، وتواصل مباشرة عبر واتساب — كله مجاني وبسيط.
+      </p>
+      <button id="closeWelcomeBtn" class="btn btn-primary btn-block">يلا نبدأ 🚀</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
