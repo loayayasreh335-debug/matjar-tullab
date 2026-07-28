@@ -4,7 +4,7 @@ const path = require('path');
 const app = express();
 
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -46,8 +46,7 @@ app.post('/api/items', async (req, res) => {
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
