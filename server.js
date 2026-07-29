@@ -1,3 +1,4 @@
+app.get("/admin.html", (req, res) => res.sendFile(__dirname + "/public/admin.html"));
 // server.js
 // سيرفر تطبيق "متجر الطلاب" - سوق مقايضة لطلاب الجامعات
 // يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
