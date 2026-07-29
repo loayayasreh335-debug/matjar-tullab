@@ -431,7 +431,8 @@ function renderCard(item) {
   const imageCountBadge = item.imageUrls && item.imageUrls.length > 1
     ? `<span class="image-count-badge">📷 ${item.imageUrls.length}</span>` : '';
 
-  const swappedBadge = item.isSwapped ? `<span class="swapped-badge">✅ تمت المقايضة</span>` : '';
+  const doneLabel = item.adType === 'sell' ? 'تم البيع' : 'تمت المقايضة';
+  const swappedBadge = item.isSwapped ? `<span class="swapped-badge">✅ ${doneLabel}</span>` : '';
 
   const whatsappHtml = item.isSwapped
     ? ''
@@ -442,7 +443,7 @@ function renderCard(item) {
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
          <button class="btn-swap ${item.isSwapped ? 'active' : ''}" data-id="${item.id}">
-           ${item.isSwapped ? '↩️ إلغاء المقايضة' : '✅ تمت المقايضة'}
+           ${item.isSwapped ? '↩️ إلغاء ' + doneLabel : '✅ ' + doneLabel}
          </button>
          <button class="btn-delete" data-id="${item.id}">🗑️ حذف</button>
        </div>`
@@ -473,7 +474,9 @@ function renderCard(item) {
       <a href="/item/${item.id}" style="text-decoration:none; color:inherit;">
         <h3 class="card-title">${escapeHtml(item.name)}</h3>
       </a>
-      <div class="card-trade">🔄 بدل بـ: ${escapeHtml(item.lookingFor)}</div>
+      ${item.adType === 'sell'
+        ? `<div class="card-trade">💰 ${item.price} د.أ</div>`
+        : `<div class="card-trade">🔄 بدل بـ: ${escapeHtml(item.lookingFor)}</div>`}
       <div class="card-meta-row">
         <span>🕒 ${formatRelativeTime(item.createdAt)}</span>
         <span>👁️ ${item.views || 0}</span>
@@ -503,13 +506,6 @@ function renderCard(item) {
   const reportBtn = card.querySelector('.btn-report');
   if (reportBtn) reportBtn.addEventListener('click', () => reportItem(item.id));
 
-card.querySelectorAll('a[href^="/item/"]').forEach(link => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.history.pushState({}, '', `/item/${item.id}`);
-    showDetailView(item.id);
-  });
-})
   return card;
 }
 
@@ -622,6 +618,30 @@ async function loadItems() {
 }
 
 // ---------- نموذج إضافة غرض جديد ----------
+// ---------- إظهار/إخفاء حقل السعر أو "المطلوب" حسب نوع الإعلان (بيع/مقايضة) ----------
+const priceField = document.getElementById('priceField');
+const lookingForField = document.getElementById('lookingForField');
+
+function updateAdTypeFieldsVisibility() {
+  const checked = itemForm.querySelector('input[name="adType"]:checked');
+  const selected = checked ? checked.value : '';
+
+  const isSell = selected === 'sell';
+  const isBarter = selected === 'barter';
+
+  priceField.style.display = isSell ? 'flex' : 'none';
+  itemForm.price.required = isSell;
+  if (!isSell) itemForm.price.value = '';
+
+  lookingForField.style.display = isBarter ? 'flex' : 'none';
+  itemForm.lookingFor.required = isBarter;
+  if (!isBarter) itemForm.lookingFor.value = '';
+}
+
+itemForm.querySelectorAll('input[name="adType"]').forEach(radio => {
+  radio.addEventListener('change', updateAdTypeFieldsVisibility);
+});
+
 itemForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   formError.textContent = '';
@@ -629,6 +649,22 @@ itemForm.addEventListener('submit', async (e) => {
   const imagesInput = itemForm.querySelector('input[name="images"]');
   if (imagesInput.files.length > 4) {
     formError.textContent = 'يمكنك رفع 4 صور كحد أقصى';
+    return;
+  }
+
+  const adTypeChecked = itemForm.querySelector('input[name="adType"]:checked');
+  const selectedAdType = adTypeChecked ? adTypeChecked.value : '';
+
+  if (!selectedAdType) {
+    formError.textContent = 'يرجى اختيار نوع الإعلان: بيع أو مقايضة';
+    return;
+  }
+  if (selectedAdType === 'sell' && (!itemForm.price.value || Number(itemForm.price.value) <= 0)) {
+    formError.textContent = 'يرجى إدخال سعر صحيح';
+    return;
+  }
+  if (selectedAdType === 'barter' && !itemForm.lookingFor.value.trim()) {
+    formError.textContent = 'يرجى تحديد ما ترغب بالمقايضة به';
     return;
   }
 
@@ -640,7 +676,9 @@ itemForm.addEventListener('submit', async (e) => {
     const formData = new FormData();
     formData.append('name', itemForm.name.value);
     formData.append('description', itemForm.description.value);
-    formData.append('lookingFor', itemForm.lookingFor.value);
+    formData.append('adType', selectedAdType);
+    formData.append('price', selectedAdType === 'sell' ? itemForm.price.value : '');
+    formData.append('lookingFor', selectedAdType === 'barter' ? itemForm.lookingFor.value : '');
     formData.append('whatsapp', itemForm.whatsapp.value);
     formData.append('university', itemForm.university.value || '');
     formData.append('gameType', itemForm.gameType.value || '');
@@ -667,6 +705,7 @@ itemForm.addEventListener('submit', async (e) => {
 
     itemForm.reset();
     updateUniversityFieldVisibility();
+    updateAdTypeFieldsVisibility();
     areaSelect.innerHTML = '<option value="" disabled selected>اختر المحافظة أولاً</option>';
     areaSelect.disabled = true;
     overlay.classList.remove('active');
@@ -698,8 +737,11 @@ function renderItemDetail(item) {
         `<button class="detail-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></button>`).join('')}</div>`
     : '';
 
+  const doneLabelDetail = item.adType === 'sell' ? 'تم بيع' : 'تمت مقايضة';
+  const doneLabelShort = item.adType === 'sell' ? 'تم البيع' : 'تمت المقايضة';
+
   const swappedNote = item.isSwapped
-    ? `<div class="card-trade" style="background:#fdecec; color:#c62828;">✅ تمت مقايضة هذا الغرض ولم يعد متاحاً</div>`
+    ? `<div class="card-trade" style="background:#fdecec; color:#c62828;">✅ ${doneLabelDetail} هذا الغرض ولم يعد متاحاً</div>`
     : '';
 
   const whatsappHtml = item.isSwapped
@@ -711,7 +753,7 @@ function renderItemDetail(item) {
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
          <button class="btn-swap ${item.isSwapped ? 'active' : ''}" id="detailSwapBtn">
-           ${item.isSwapped ? '↩️ إلغاء المقايضة' : '✅ تمت المقايضة'}
+           ${item.isSwapped ? '↩️ إلغاء ' + doneLabelShort : '✅ ' + doneLabelShort}
          </button>
          <button class="btn-delete" id="detailDeleteBtn">🗑️ حذف</button>
        </div>`
@@ -742,7 +784,9 @@ function renderItemDetail(item) {
         </div>
         <h1 class="detail-title">${escapeHtml(item.name)}</h1>
         <p class="detail-desc">${escapeHtml(item.description)}</p>
-        <div class="card-trade">🔄 بدل بـ: ${escapeHtml(item.lookingFor)}</div>
+        ${item.adType === 'sell'
+          ? `<div class="card-trade">💰 السعر: ${item.price} دينار أردني</div>`
+          : `<div class="card-trade">🔄 بدل بـ: ${escapeHtml(item.lookingFor)}</div>`}
         ${swappedNote}
         <div class="detail-meta">
           <span>🕒 ${formatRelativeTime(item.createdAt)}</span>

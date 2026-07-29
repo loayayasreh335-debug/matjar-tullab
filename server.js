@@ -1,30 +1,26 @@
 // server.js
 // سيرفر تطبيق "متجر الطلاب" - سوق مقايضة لطلاب الجامعات
-// يستخدم Express + Multer + MongoDB Atlas (Mongoose) لتخزين دائم للإعلانات
+// يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
+// كلاهما مجاني للأبد بدون بطاقة ائتمان - لا يعتمد على القرص المحلي إطلاقاً
+
+require('dotenv').config();
 
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ---------- الاتصال بقاعدة بيانات MongoDB Atlas ----------
-const MONGODB_URI = process.env.MONGODB_URI;
-if (MONGODB_URI) {
-  mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ MongoDB Connected Successfully'))
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
-} else {
-  console.error('⚠️ لم يتم ضبط متغير البيئة MONGODB_URI');
-}
-
+// مدة صلاحية الإعلان قبل حذفه تلقائياً (بالمللي ثانية) = 30 يوماً
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_IMAGES = 4;
 
+// قائمة الجامعات الأردنية المتاحة للاختيار
 const JORDAN_UNIVERSITIES = [
   'الجامعة الأردنية', 'جامعة اليرموك', 'جامعة العلوم والتكنولوجيا الأردنية',
   'جامعة البلقاء التطبيقية - السلط', 'الجامعة الأردنية الألمانية', 'الجامعة الهاشمية',
@@ -34,96 +30,148 @@ const JORDAN_UNIVERSITIES = [
   'جامعة عمان العربية', 'جامعة جدارا', 'جامعة أخرى'
 ];
 
+// قائمة تصنيفات الأغراض
 const CATEGORIES = [
-  'كتب دراسية', 'قرطاسية وأدوات مكتبية', 'إلكترونيات',
-  'أثاث ومستلزمات سكن', 'ملابس وأزياء', 'حسابات ألعاب', 'أخرى'
+  'كتب دراسية', 'قرطاسية وأدوات مكتبية', 'إلكترونيات', 'أثاث ومستلزمات سكن',
+  'ملابس وأزياء', 'حسابات ألعاب', 'أخرى'
 ];
 
+// التصنيفات التي تحتاج تنبيه أمان خاص عند النشر
 const RISKY_CATEGORIES = ['حسابات ألعاب'];
 
+// أنواع الألعاب المتاحة لتصنيف حسابات الألعاب
 const GAME_TYPES = [
-  'ببجي موبايل (PUBG)', 'فري فاير (Free Fire)', 'فورتنايت (Fortnite)',
-  'فيفا (FIFA)', 'بيس (PES)', 'كلاش أوف كلانس', 'ماين كرافت', 'روبلوکس', 'لعبة أخرى'
+  'ببجي موبايل (PUBG)', 'فري فاير (Free Fire)', 'فورتنايت (Fortnite)', 'فيفا (FIFA)',
+  'بيس (PES)', 'كلاش أوف كلانس', 'ماين كرافت', 'روبلوکس', 'لعبة أخرى'
 ];
 
+// التصنيفات التي يكون فيها حقل "نوع اللعبة" إجبارياً
 const GAME_RELATED_CATEGORIES = ['حسابات ألعاب'];
 
+// محافظات الأردن ومناطقها الفرعية
 const JORDAN_LOCATIONS = {
-  'عمان': ['وسط البلد','جبل عمان','جبل اللويبدة','الشميساني','عبدون','دابوق','خلدا','أم أذينة','تلاع العلي','صويلح','الجبيهة','الرابية','أم السماق','دير غبار','ماركا','النصر','القويسمة','سحاب','طبربور','الدوار السابع','الدوار الثامن','حي نزال','جبل الحسين','زهران','شفا بدران','بيادر وادي السير','ياجوز','المقابلين','أخرى'],
-  'إربد': ['مركز إربد','الرمثا','الحصن','بشرى','كفرسوم','الطرة','النعيمة','حوارة','إربد الجديدة','الشونة الشمالية','أخرى'],
-  'الزرقاء': ['مركز الزرقاء','الرصيفة','الهاشمية','الأزرق','الضليل','أخرى'],
-  'البلقاء': ['السلط','الفحيص','ماحص','عين الباشا','دير علا','أخرى'],
-  'مادبا': ['مادبا المدينة','ذيبان','الفيصلية','أخرى'],
-  'الكرك': ['الكرك المدينة','القصر','المزار الجنوبي','عي','الأغوار الجنوبية','أخرى'],
-  'الطفيلة': ['الطفيلة المدينة','بصيرا','الحسا','أخرى'],
-  'معان': ['معان المدينة','الشوبك','وادي موسى (البترا)','الجفر','أخرى'],
-  'العقبة': ['العقبة المدينة','القويرة','الديسة','أخرى'],
-  'جرش': ['وسط المدينة','ساكب','كتة','ريمون','برما','سوف','أخرى'],
-  'عجلون': ['عجلون المدينة','عنجرة','كفرنجة','صخرة','أخرى'],
-  'المفرق': ['المفرق المدينة','الرويشد','الخالدية','البادية الشمالية','أخرى']
+  'عمان': [
+    'وسط البلد', 'جبل عمان', 'جبل اللويبدة', 'الشميساني', 'عبدون', 'دابوق',
+    'خلدا', 'أم أذينة', 'تلاع العلي', 'صويلح', 'الجبيهة', 'الرابية',
+    'أم السماق', 'دير غبار', 'ماركا', 'النصر', 'القويسمة', 'سحاب',
+    'طبربور', 'الدوار السابع', 'الدوار الثامن', 'حي نزال', 'جبل الحسين',
+    'زهران', 'شفا بدران', 'بيادر وادي السير', 'ياجوز', 'المقابلين', 'أخرى'
+  ],
+  'إربد': ['مركز إربد', 'الرمثا', 'الحصن', 'بشرى', 'كفرسوم', 'الطرة', 'النعيمة', 'حوارة', 'إربد الجديدة', 'الشونة الشمالية', 'أخرى'],
+  'الزرقاء': ['مركز الزرقاء', 'الرصيفة', 'الهاشمية', 'الأزرق', 'الضليل', 'أخرى'],
+  'البلقاء': ['السلط', 'الفحيص', 'ماحص', 'عين الباشا', 'دير علا', 'أخرى'],
+  'مادبا': ['مادبا المدينة', 'ذيبان', 'الفيصلية', 'أخرى'],
+  'الكرك': ['الكرك المدينة', 'القصر', 'المزار الجنوبي', 'عي', 'الأغوار الجنوبية', 'أخرى'],
+  'الطفيلة': ['الطفيلة المدينة', 'بصيرا', 'الحسا', 'أخرى'],
+  'معان': ['معان المدينة', 'الشوبك', 'وادي موسى (البترا)', 'الجفر', 'أخرى'],
+  'العقبة': ['العقبة المدينة', 'القويرة', 'الديسة', 'أخرى'],
+  'جرش': ['وسط المدينة', 'ساكب', 'كتة', 'ريمون', 'برما', 'سوف', 'أخرى'],
+  'عجلون': ['عجلون المدينة', 'عنجرة', 'كفرنجة', 'صخرة', 'أخرى'],
+  'المفرق': ['المفرق المدينة', 'الرويشد', 'الخالدية', 'البادية الشمالية', 'أخرى']
 };
 
+// التصنيفات التي يكون فيها حقل الجامعة إجبارياً
 const UNIVERSITY_RELATED_CATEGORIES = ['كتب دراسية', 'قرطاسية وأدوات مكتبية'];
+
+// رقم واتساب صاحب المنصة للتواصل بخصوص مشاكل أو اقتراحات
 const DEVELOPER_WHATSAPP = '962771587863';
 
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// صورة افتراضية تُستخدم تلقائياً عندما لا يرفع المستخدم أي صورة للإعلان
+// (رابط حقيقي قابل للجلب - يظهر بشكل صحيح بمعاينات المشاركة على واتساب/فيسبوك، بعكس صورة CSS محلية)
+const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/800x600/e5e7eb/6b7280?text=%F0%9F%93%A6+%D9%84%D8%A7+%D8%AA%D9%88%D8%AC%D8%AF+%D8%B5%D9%88%D8%B1%D8%A9';
 
-// ---------- نموذج الإعلان بقاعدة البيانات ----------
-const itemSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: String,
-  description: String,
-  lookingFor: String,
-  whatsapp: String,
-  university: { type: String, default: '' },
-  category: { type: String, default: 'أخرى' },
-  gameType: { type: String, default: '' },
-  governorate: { type: String, default: '' },
-  area: { type: String, default: '' },
-  imageUrls: { type: [String], default: [] },
-  createdAt: { type: Number, default: Date.now },
-  isSwapped: { type: Boolean, default: false },
-  views: { type: Number, default: 0 },
-  ownerToken: String
-});
-const Item = mongoose.model('Item', itemSchema);
+// أنواع الإعلان المتاحة
+const AD_TYPES = ['sell', 'barter'];
 
-const reportSchema = new mongoose.Schema({
-  itemId: String,
-  itemName: String,
-  reason: String,
-  reportedAt: { type: Number, default: Date.now }
-});
-const Report = mongoose.model('Report', reportSchema);
-
-function toPublicItem(item) {
-  const obj = item.toObject ? item.toObject() : item;
-  const { ownerToken, _id, __v, ...publicItem } = obj;
-  return publicItem;
+// ---------- إعداد الاتصال بـ MongoDB Atlas (تخزين البيانات الدائم) ----------
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('❌ خطأ: متغير البيئة MONGODB_URI غير موجود. راجع ملف .env أو إعدادات Render.');
+  process.exit(1);
 }
 
-async function cleanupExpiredItems() {
-  try {
-    const now = Date.now();
-    const expired = await Item.find({ createdAt: { $lt: now - EXPIRY_MS } });
-    if (expired.length > 0) {
-      for (const item of expired) {
-        for (const imgUrl of item.imageUrls || []) {
-          const imgPath = path.join(__dirname, imgUrl);
-          if (fs.existsSync(imgPath)) fs.unlink(imgPath, () => {});
-        }
+let db;
+const mongoClient = new MongoClient(MONGODB_URI);
+
+async function connectDB() {
+  await mongoClient.connect();
+  db = mongoClient.db(); // اسم القاعدة يُقرأ من نهاية رابط الاتصال نفسه
+  await db.collection('items').createIndex({ id: 1 }, { unique: true });
+  await db.collection('items').createIndex({ createdAt: -1 });
+  console.log('✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح');
+}
+
+// ---------- إعداد Cloudinary (تخزين الصور الدائم) ----------
+// يقرأ تلقائياً متغير البيئة CLOUDINARY_URL إن وُجد
+if (!process.env.CLOUDINARY_URL) {
+  console.error('❌ خطأ: متغير البيئة CLOUDINARY_URL غير موجود. راجع ملف .env أو إعدادات Render.');
+  process.exit(1);
+}
+
+function uploadImageToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'matjar-tullab', resource_type: 'image' },
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ url: result.secure_url, publicId: result.public_id });
       }
-      await Item.deleteMany({ createdAt: { $lt: now - EXPIRY_MS } });
-      console.log(`🧹 تم حذف ${expired.length} إعلان منتهي الصلاحية`);
+    );
+    stream.end(buffer);
+  });
+}
+
+async function deleteImagesFromCloudinary(publicIds) {
+  for (const publicId of publicIds || []) {
+    try {
+      await cloudinary.uploader.destroy(publicId);
+    } catch (err) {
+      console.error('تعذر حذف صورة من Cloudinary:', publicId, err.message);
     }
-  } catch (err) {
-    console.error('خطأ أثناء تنظيف الإعلانات المنتهية:', err);
   }
 }
 
+// ---------- دوال مساعدة ----------
+
+// توحيد شكل الإعلان (يدعم إعلانات قديمة إن وُجدت)
+function normalizeItem(item) {
+  if (!item.imageUrls) item.imageUrls = [];
+  if (!item.imagePublicIds) item.imagePublicIds = [];
+  if (!item.category) item.category = 'أخرى';
+  if (!item.gameType) item.gameType = '';
+  if (!item.governorate) item.governorate = '';
+  if (!item.area) item.area = '';
+  if (!item.adType) item.adType = 'barter'; // الإعلانات القديمة كلها كانت مقايضة قبل هذه الميزة
+  if (typeof item.price !== 'number') item.price = null;
+  if (typeof item.views !== 'number') item.views = 0;
+  if (typeof item.isSwapped !== 'boolean') item.isSwapped = false;
+  return item;
+}
+
+// إخفاء الحقول الحساسة قبل إرسال الإعلان للعميل
+function toPublicItem(item) {
+  const { ownerToken, imagePublicIds, _id, ...publicItem } = item;
+  return publicItem;
+}
+
+// حذف الإعلانات المنتهية (أقدم من 30 يوماً) مع صورها من Cloudinary
+async function cleanupExpiredItems() {
+  const cutoff = Date.now() - EXPIRY_MS;
+  const expired = await db.collection('items').find({ createdAt: { $lt: cutoff } }).toArray();
+
+  if (expired.length > 0) {
+    for (const item of expired) {
+      await deleteImagesFromCloudinary(item.imagePublicIds);
+    }
+    await db.collection('items').deleteMany({ createdAt: { $lt: cutoff } });
+    console.log(`🧹 تم حذف ${expired.length} إعلان منتهي الصلاحية (أقدم من 30 يوماً)`);
+  }
+}
+
+// حد أقصى لعدد الإعلانات المسموح نشرها من نفس الجهاز خلال 24 ساعة (حماية بسيطة من السبام)
 const DAILY_POST_LIMIT = 5;
-const deviceLimitTracker = new Map();
+const deviceLimitTracker = new Map(); // deviceId => [timestamps]
+
 function isRateLimited(deviceId) {
   if (!deviceId) return false;
   const now = Date.now();
@@ -132,6 +180,7 @@ function isRateLimited(deviceId) {
   deviceLimitTracker.set(deviceId, timestamps);
   return timestamps.length >= DAILY_POST_LIMIT;
 }
+
 function recordPost(deviceId) {
   if (!deviceId) return;
   const timestamps = deviceLimitTracker.get(deviceId) || [];
@@ -139,13 +188,7 @@ function recordPost(deviceId) {
   deviceLimitTracker.set(deviceId, timestamps);
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, 'item-' + Date.now() + '-' + Math.round(Math.random() * 1e9) + ext);
-  }
-});
+// ---------- إعداد رفع الصور (Multer في الذاكرة - بدون حفظ محلي) ----------
 function fileFilter(req, file, cb) {
   const allowed = /jpeg|jpg|png|gif|webp/;
   const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
@@ -153,12 +196,19 @@ function fileFilter(req, file, cb) {
   if (extOk && mimeOk) cb(null, true);
   else cb(new Error('نوع الملف غير مدعوم. يرجى رفع صور (jpg, png, gif, webp)'));
 }
-const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+// ---------- الميدلوير العام ----------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(UPLOADS_DIR));
+
+// ---------- المسارات (API Routes) ----------
 
 app.get('/api/universities', (req, res) => res.json(JORDAN_UNIVERSITIES));
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
@@ -168,19 +218,32 @@ app.get('/api/locations', (req, res) => res.json(JORDAN_LOCATIONS));
 app.get('/api/developer-contact', (req, res) => res.json({ whatsapp: DEVELOPER_WHATSAPP }));
 
 app.get('/api/stats', async (req, res) => {
-  await cleanupExpiredItems();
-  const totalItems = await Item.countDocuments();
-  res.json({ totalItems });
+  try {
+    await cleanupExpiredItems();
+    const totalItems = await db.collection('items').countDocuments();
+    res.json({ totalItems });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'تعذر جلب الإحصائيات' });
+  }
 });
 
 app.post('/api/items/:id/report', async (req, res) => {
   try {
     const { reason } = req.body;
-    const item = await Item.findOne({ id: req.params.id });
+    const item = await db.collection('items').findOne({ id: req.params.id });
     if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
-    await Report.create({ itemId: item.id, itemName: item.name, reason: (reason || 'غير محدد').trim().slice(0, 300) });
+
+    await db.collection('reports').insertOne({
+      itemId: item.id,
+      itemName: item.name,
+      reason: (reason || 'غير محدد').trim().slice(0, 300),
+      reportedAt: Date.now()
+    });
+
     res.status(201).json({ success: true });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'تعذر إرسال البلاغ' });
   }
 });
@@ -188,22 +251,27 @@ app.post('/api/items/:id/report', async (req, res) => {
 app.get('/api/items', async (req, res) => {
   try {
     await cleanupExpiredItems();
-    const items = await Item.find().sort({ createdAt: -1 });
-    res.json(items.map(toPublicItem));
+    const items = await db.collection('items').find({}).sort({ createdAt: -1 }).toArray();
+    res.json(items.map(normalizeItem).map(toPublicItem));
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch items' });
+    console.error(err);
+    res.status(500).json({ error: 'تعذر جلب الإعلانات' });
   }
 });
 
 app.get('/api/items/:id', async (req, res) => {
   try {
-    const item = await Item.findOne({ id: req.params.id });
+    const result = await db.collection('items').findOneAndUpdate(
+      { id: req.params.id },
+      { $inc: { views: 1 } },
+      { returnDocument: 'after' }
+    );
+    const item = result && result.value ? result.value : result;
     if (!item) return res.status(404).json({ error: 'الإعلان غير موجود أو تم حذفه' });
-    item.views = (item.views || 0) + 1;
-    await item.save();
-    res.json(toPublicItem(item));
+    res.json(toPublicItem(normalizeItem(item)));
   } catch (err) {
-    res.status(500).json({ error: 'خطأ في جلب الإعلان' });
+    console.error(err);
+    res.status(500).json({ error: 'تعذر جلب الإعلان' });
   }
 });
 
@@ -213,42 +281,73 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
     if (isRateLimited(deviceId)) {
       return res.status(429).json({ error: `وصلت للحد الأقصى (${DAILY_POST_LIMIT} إعلانات) خلال 24 ساعة. حاول مرة أخرى لاحقاً.` });
     }
-    const { name, description, lookingFor, whatsapp, university, category, gameType, governorate, area } = req.body;
-    if (!name || !description || !lookingFor || !whatsapp || !category || !governorate || !area) {
+
+    const { name, description, lookingFor, whatsapp, university, category, gameType, governorate, area, adType, price } = req.body;
+
+    if (!name || !description || !whatsapp || !category || !governorate || !area) {
       return res.status(400).json({ error: 'يرجى تعبئة جميع الحقول المطلوبة (بما فيها المحافظة والمنطقة)' });
     }
     if (!JORDAN_LOCATIONS[governorate] || !JORDAN_LOCATIONS[governorate].includes(area)) {
       return res.status(400).json({ error: 'المحافظة أو المنطقة المختارة غير صحيحة' });
     }
-    if (UNIVERSITY_RELATED_CATEGORIES.includes(category.trim()) && !university) {
+
+    const cleanAdType = AD_TYPES.includes(adType) ? adType : null;
+    if (!cleanAdType) {
+      return res.status(400).json({ error: 'يرجى اختيار نوع الإعلان: بيع أو مقايضة' });
+    }
+
+    let cleanPrice = null;
+    if (cleanAdType === 'sell') {
+      const parsedPrice = parseFloat(price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        return res.status(400).json({ error: 'يرجى إدخال سعر صحيح للإعلان' });
+      }
+      cleanPrice = parsedPrice;
+    } else if (cleanAdType === 'barter' && !lookingFor) {
+      return res.status(400).json({ error: 'يرجى تحديد ما ترغب بالمقايضة به' });
+    }
+
+    const isUniversityRequired = UNIVERSITY_RELATED_CATEGORIES.includes(category.trim());
+    if (isUniversityRequired && !university) {
       return res.status(400).json({ error: 'يرجى اختيار الجامعة لهذا التصنيف' });
     }
-    if (GAME_RELATED_CATEGORIES.includes(category.trim()) && !gameType) {
+    const isGameTypeRequired = GAME_RELATED_CATEGORIES.includes(category.trim());
+    if (isGameTypeRequired && !gameType) {
       return res.status(400).json({ error: 'يرجى اختيار نوع اللعبة' });
     }
+
+    // رفع الصور إلى Cloudinary (اختياري تماماً - لو ما رفع المستخدم أي صورة نستخدم صورة افتراضية)
+    const uploaded = await Promise.all(
+      (req.files || []).map(f => uploadImageToCloudinary(f.buffer))
+    );
+
     const cleanedWhatsapp = whatsapp.trim().replace(/[^\d+]/g, '');
     const ownerToken = crypto.randomBytes(16).toString('hex');
-    const imageUrls = (req.files || []).map(f => '/uploads/' + f.filename);
 
-    const newItem = await Item.create({
+    const newItem = {
       id: Date.now().toString(36) + Math.round(Math.random() * 1e6).toString(36),
       name: name.trim(),
       description: description.trim(),
-      lookingFor: lookingFor.trim(),
+      adType: cleanAdType,
+      price: cleanPrice,
+      lookingFor: cleanAdType === 'barter' ? lookingFor.trim() : '',
       whatsapp: cleanedWhatsapp,
       university: university ? university.trim() : '',
       category: category.trim(),
       gameType: gameType ? gameType.trim() : '',
       governorate: governorate.trim(),
       area: area.trim(),
-      imageUrls,
+      imageUrls: uploaded.length ? uploaded.map(u => u.url) : [PLACEHOLDER_IMAGE_URL],
+      imagePublicIds: uploaded.map(u => u.publicId), // فاضية لو استخدمنا الصورة الافتراضية (لا شيء نحذفه من Cloudinary لاحقاً)
       createdAt: Date.now(),
       isSwapped: false,
       views: 0,
       ownerToken
-    });
+    };
 
+    await db.collection('items').insertOne(newItem);
     recordPost(deviceId);
+
     res.status(201).json({ ...toPublicItem(newItem), ownerToken });
   } catch (err) {
     console.error(err);
@@ -259,15 +358,20 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
 app.patch('/api/items/:id/swap', async (req, res) => {
   try {
     const { ownerToken } = req.body;
-    const item = await Item.findOne({ id: req.params.id });
+    const item = await db.collection('items').findOne({ id: req.params.id });
     if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
     if (!ownerToken || ownerToken !== item.ownerToken) {
       return res.status(403).json({ error: 'غير مصرح لك بتعديل هذا الإعلان' });
     }
-    item.isSwapped = !item.isSwapped;
-    await item.save();
-    res.json(toPublicItem(item));
+
+    await db.collection('items').updateOne(
+      { id: req.params.id },
+      { $set: { isSwapped: !item.isSwapped } }
+    );
+    const updated = await db.collection('items').findOne({ id: req.params.id });
+    res.json(toPublicItem(normalizeItem(updated)));
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'تعذر تحديث حالة الإعلان' });
   }
 });
@@ -275,24 +379,26 @@ app.patch('/api/items/:id/swap', async (req, res) => {
 app.delete('/api/items/:id', async (req, res) => {
   try {
     const { ownerToken } = req.body;
-    const item = await Item.findOne({ id: req.params.id });
+    const item = await db.collection('items').findOne({ id: req.params.id });
     if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
     if (!ownerToken || ownerToken !== item.ownerToken) {
       return res.status(403).json({ error: 'غير مصرح لك بحذف هذا الإعلان' });
     }
-    for (const imgUrl of item.imageUrls || []) {
-      const imgPath = path.join(__dirname, imgUrl);
-      if (fs.existsSync(imgPath)) fs.unlink(imgPath, () => {});
-    }
-    await Item.deleteOne({ id: req.params.id });
+
+    await deleteImagesFromCloudinary(item.imagePublicIds);
+    await db.collection('items').deleteOne({ id: req.params.id });
     res.json({ success: true });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'تعذر حذف الإعلان' });
   }
 });
 
+// تهريب النصوص قبل إدراجها داخل خصائص HTML
 function escapeAttr(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function injectOgTags(html, { title, description, image, url }) {
@@ -306,11 +412,13 @@ function injectOgTags(html, { title, description, image, url }) {
 
 app.get('/item/:id', async (req, res) => {
   try {
-    const item = await Item.findOne({ id: req.params.id });
+    const item = await db.collection('items').findOne({ id: req.params.id });
     const baseHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf-8');
     if (!item) return res.send(baseHtml);
+
     const fullUrl = `${req.protocol}://${req.get('host')}/item/${item.id}`;
-    const imageUrl = item.imageUrls && item.imageUrls[0] ? `${req.protocol}://${req.get('host')}${item.imageUrls[0]}` : '';
+    const imageUrl = item.imageUrls && item.imageUrls[0] ? item.imageUrls[0] : '';
+
     const html = injectOgTags(baseHtml, {
       title: `${item.name} | متجر الطلاب`,
       description: `متاح للمقايضة بـ: ${item.lookingFor} — ${item.description}`.slice(0, 200),
@@ -319,6 +427,7 @@ app.get('/item/:id', async (req, res) => {
     });
     res.send(html);
   } catch (err) {
+    console.error(err);
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
@@ -327,6 +436,7 @@ app.get('/university/:name', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// معالجة أخطاء Multer
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || err) {
     return res.status(400).json({ error: err.message });
@@ -334,38 +444,47 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// صفحة 404 مخصصة
 app.use((req, res) => {
   res.status(404).send(`
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>الصفحة غير موجودة | متجر الطلاب</title>
-<style>
-body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
-display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
-.box { max-width:380px; }
-.emoji { font-size:60px; margin-bottom:10px; }
-h1 { font-size:20px; margin:0 0 10px; }
-p { color:#6b7280; font-size:14px; margin:0 0 20px; }
-a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
-</style>
-</head>
-<body>
-<div class="box">
-<div class="emoji">🔍📦</div>
-<h1>هاي الصفحة مش موجودة</h1>
-<p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
-<a href="/">🏠 الصفحة الرئيسية</a>
-</div>
-</body>
-</html>
-`);
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>الصفحة غير موجودة | متجر الطلاب</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
+               display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
+        .box { max-width:380px; }
+        .emoji { font-size:60px; margin-bottom:10px; }
+        h1 { font-size:20px; margin:0 0 10px; }
+        p { color:#6b7280; font-size:14px; margin:0 0 20px; }
+        a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <div class="emoji">🔍📦</div>
+        <h1>هاي الصفحة مش موجودة</h1>
+        <p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
+        <a href="/">🏠 الصفحة الرئيسية</a>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ السيرفر يعمل الآن على المنفذ ${PORT}`);
-  cleanupExpiredItems();
-  setInterval(cleanupExpiredItems, 12 * 60 * 60 * 1000);
-});
+// ---------- تشغيل السيرفر ----------
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
+      cleanupExpiredItems();
+      setInterval(cleanupExpiredItems, 12 * 60 * 60 * 1000);
+    });
+  })
+  .catch(err => {
+    console.error('❌ فشل الاتصال بقاعدة البيانات:', err.message);
+    process.exit(1);
+  });

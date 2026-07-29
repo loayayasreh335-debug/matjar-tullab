@@ -749,6 +749,39 @@ html[data-theme="dark"] .risky-warning {
   color: #e0c778;
 }
 
+/* ---------- زر التبديل بين بيع ومقايضة ---------- */
+.ad-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ad-type-option {
+  flex: 1;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.ad-type-option input {
+  display: none;
+}
+
+.ad-type-option:has(input:checked) {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 /* ---------- نافذة دعم المطور ---------- */
 .support-text {
   font-size: 14px;
