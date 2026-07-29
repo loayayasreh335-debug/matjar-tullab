@@ -474,7 +474,24 @@ app.use((req, res) => {
     </html>
   `);
 });
-
+// حذف إعلان من قبل المطور (للوحة الإدارية)
+app.delete('/api/admin/items/:id', async (req, res) => {
+  try {
+    const { adminPassword } = req.body;
+    if (adminPassword !== 'admin123') {
+      return res.status(403).json({ error: 'غير مصرح لك بالحذف' });
+    }
+    const item = await db.collection('items').findOne({ id: req.params.id });
+    if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
+    
+    await deleteImagesFromCloudinary(item.imagePublicIds);
+    await db.collection('items').deleteOne({ id: req.params.id });
+    res.json({ success: true, message: 'تم حذف الإعلان بنجاح' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'تعذر حذف الإعلان' });
+  }
+});
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
