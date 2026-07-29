@@ -7,16 +7,25 @@ const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
 
-// التوجيه الأول والأعلى أولوية لأي رابط يحتوي كلمة admin
+// مسار الأدمن Mappings
 app.use((req, res, next) => {
-    if (req.url.toLowerCase().includes('admin')) {
+    if (req.url.toLowerCase().includes('admin.html') || req.url.toLowerCase() === '/admin') {
         return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
     }
     next();
 });
 
-// خدمة ملفات المجلد العام
 app.use(express.static(path.join(__dirname, 'public')));
+
+// API تسجيل الدخول للأدمن
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === 'admin123') {
+        res.json({ success: true, message: 'Login successful' });
+    } else {
+        res.status(401).json({ success: false, message: 'كلمة السر غير صحيحة' });
+    }
+});
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://loay:loay123@cluster0.mongodb.net/matjar?retryWrites=true&w=majority";
 
