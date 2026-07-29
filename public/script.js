@@ -364,6 +364,19 @@ async function loadCategories() {
 }
 
 // ---------- أدوات مساعدة ----------
+// دالة عامة: عند فشل تحميل أي صورة (رابط قديم مكسور، حذف من Cloudinary، إلخ)
+// تستبدلها تلقائياً بصندوق نائب أنيق بدل أيقونة الصورة المكسورة الافتراضية بالمتصفح
+function handleImageError(imgEl) {
+  const wrap = imgEl.parentElement;
+  const isDetail = imgEl.classList.contains('detail-main-image');
+  imgEl.remove();
+  const placeholder = document.createElement('div');
+  placeholder.className = isDetail ? 'detail-main-image placeholder' : 'card-image placeholder';
+  placeholder.textContent = '📦';
+  wrap.prepend(placeholder);
+}
+window.handleImageError = handleImageError;
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
@@ -425,7 +438,7 @@ function renderCard(item) {
 
   const firstImage = item.imageUrls && item.imageUrls[0];
   const imageHtml = firstImage
-    ? `<img class="card-image" src="${firstImage}" alt="${escapeHtml(item.name)}">`
+    ? `<img class="card-image" src="${firstImage}" alt="${escapeHtml(item.name)}" onerror="handleImageError(this)">`
     : `<div class="card-image placeholder">📦</div>`;
 
   const imageCountBadge = item.imageUrls && item.imageUrls.length > 1
@@ -729,7 +742,7 @@ function renderItemDetail(item) {
   let currentImageIndex = 0;
 
   const mainImageHtml = images[0]
-    ? `<img class="detail-main-image" id="detailMainImage" src="${images[0]}" alt="${escapeHtml(item.name)}">`
+    ? `<img class="detail-main-image" id="detailMainImage" src="${images[0]}" alt="${escapeHtml(item.name)}" onerror="handleImageError(this)">`
     : `<div class="detail-main-image placeholder" id="detailMainImage">📦</div>`;
 
   const dotsHtml = images.length > 1

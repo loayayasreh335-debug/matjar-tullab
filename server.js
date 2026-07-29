@@ -77,8 +77,8 @@ const UNIVERSITY_RELATED_CATEGORIES = ['كتب دراسية', 'قرطاسية و
 const DEVELOPER_WHATSAPP = '962771587863';
 
 // صورة افتراضية تُستخدم تلقائياً عندما لا يرفع المستخدم أي صورة للإعلان
-// (رابط حقيقي قابل للجلب - يظهر بشكل صحيح بمعاينات المشاركة على واتساب/فيسبوك، بعكس صورة CSS محلية)
-const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/800x600/e5e7eb/6b7280?text=%F0%9F%93%A6+%D9%84%D8%A7+%D8%AA%D9%88%D8%AC%D8%AF+%D8%B5%D9%88%D8%B1%D8%A9';
+// (نص إنجليزي بسيط فقط بالرابط - خدمة placehold.co لا تدعم عرض الخطوط العربية بشكل صحيح)
+const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/800x600/e5e7eb/6b7280?text=No+Image';
 
 // أنواع الإعلان المتاحة
 const AD_TYPES = ['sell', 'barter'];
