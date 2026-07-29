@@ -1,4 +1,3 @@
-app.get("/admin.html", (req, res) => res.sendFile(__dirname + "/public/admin.html"));
 // server.js
 // سيرفر تطبيق "متجر الطلاب" - سوق مقايضة لطلاب الجامعات
 // يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
@@ -15,6 +14,7 @@ const { MongoClient } = require('mongodb');
 const cloudinary = require('cloudinary').v2;
 
 const app = express();
+app.get("/admin.html", (req, res) => res.sendFile(__dirname + "/public/admin.html"));
 const PORT = process.env.PORT || 3000;
 
 // مدة صلاحية الإعلان قبل حذفه تلقائياً (بالمللي ثانية) = 30 يوماً
