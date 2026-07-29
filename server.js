@@ -3,12 +3,15 @@ const path = require('path');
 const mongoose = require('mongoose');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
+
+// خدمة ملفات المجلد العام
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/admin.html', (req, res) => {
+// مسار صريح لصفحة الأدمن بحروف صغيرة وكبيرة لقطع الشك باليقين
+app.get(['/admin.html', '/Admin.html', '/admin'], (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
