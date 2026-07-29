@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>متجر الطلاب | سوق مقايضة الكتب والأغراض الجامعية</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- الهيدر -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <div class="logo">
+        <span class="logo-icon">🎓</span>
+        <span>متجر الطلاب</span>
+      </div>
+      <button id="openFormBtn" class="btn btn-primary">+ أضف غرضك</button>
+    </div>
+  </header>
+
+  <!-- قسم ترحيبي بسيط -->
+  <section class="hero">
+    <h1>بادل كتبك وأغراضك مع طلاب جامعتك</h1>
+    <p>منصة مجانية وبسيطة لعرض الكتب الدراسية والأدوات الجامعية للمقايضة بدل الشراء</p>
+  </section>
+
+  <!-- شبكة الإعلانات -->
+  <main class="container">
+    <div id="itemsCount" class="items-count"></div>
+    <div id="itemsGrid" class="grid"></div>
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <p>لا توجد أغراض معروضة حالياً.</p>
+      <p>كن أول من يضيف غرضاً للمقايضة! 👇</p>
+    </div>
+  </main>
+
+  <!-- نافذة نموذج إضافة غرض -->
+  <div id="formOverlay" class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>إضافة غرض جديد للمقايضة</h2>
+        <button id="closeFormBtn" class="btn-close">✕</button>
+      </div>
+
+      <form id="itemForm" class="item-form">
+        <label>
+          اسم الغرض
+          <input type="text" name="name" placeholder="مثال: كتاب مبادئ الاقتصاد" required>
+        </label>
+
+        <label>
+          الوصف
+          <textarea name="description" rows="3" placeholder="اكتب وصفاً مختصراً عن حالة الغرض وتفاصيله" required></textarea>
+        </label>
+
+        <label>
+          ماذا تريد بدلاً منه؟
+          <input type="text" name="lookingFor" placeholder="مثال: كتاب المحاسبة المالية 1" required>
+        </label>
+
+        <label>
+          رقم الواتساب (مع رمز الدولة)
+          <input type="tel" name="whatsapp" placeholder="مثال: 9665xxxxxxxx" required>
+        </label>
+
+        <label>
+          صورة الغرض
+          <input type="file" name="image" accept="image/*" required>
+        </label>
+
+        <div id="formError" class="form-error"></div>
+
+        <button type="submit" class="btn btn-primary btn-block">نشر الإعلان</button>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>متجر الطلاب © 2026 — منصة مقايضة غير ربحية بين الطلاب</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
