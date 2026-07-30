@@ -480,6 +480,7 @@ app.use((req, res) => {
 connectDB()
   .then(() => {
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD });
+  require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary });
     app.listen(PORT, () => {
       console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
       cleanupExpiredItems();
@@ -490,3 +491,4 @@ connectDB()
     console.error('❌ فشل الاتصال بقاعدة البيانات:', err.message);
     process.exit(1);
   });
+
