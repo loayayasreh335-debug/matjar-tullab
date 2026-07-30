@@ -519,7 +519,13 @@ function renderCard(item) {
   const reportBtn = card.querySelector('.btn-report');
   if (reportBtn) reportBtn.addEventListener('click', () => reportItem(item.id));
 
-  return card;
+card.querySelectorAll('a[href^="/item/"]').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.history.pushState({}, '', `/item/${item.id}`);
+    showDetailView(item.id);
+  });
+});  return card;
 }
 
 // ---------- إجراءات الحذف وتبديل حالة المقايضة ----------
