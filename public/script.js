@@ -453,6 +453,10 @@ function renderCard(item) {
          💬 تواصل عبر واتساب
        </a>`;
 
+  const escrowHtml = (item.category === 'حسابات ألعاب' && !isOwner && !item.isSwapped)
+    ? `<button class="btn-escrow" onclick="openEscrowModal('${item.id}', '${escapeHtml(item.whatsapp)}', '${escapeHtml(item.name)}')">🔒 طلب وسيط آمن</button>`
+    : '';
+
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
          <button class="btn-swap ${item.isSwapped ? 'active' : ''}" data-id="${item.id}">
@@ -813,6 +817,7 @@ function renderItemDetail(item) {
         </div>
         <div class="card-actions-row">
           ${whatsappHtml}
+            ${escrowHtml}
           <button class="btn-share" id="detailShareBtn">🔗 مشاركة</button>
           <button class="btn-copy-link" id="detailCopyLinkBtn">📋 نسخ الرابط</button>
         </div>
@@ -955,3 +960,85 @@ loadLocations();
 loadDeveloperContact();
 loadStats();
 maybeShowWelcome();
+
+// ================= Escrow (نظام الوسيط الآمن) =================
+function openEscrowModal(itemId, ownerWhatsapp, itemName) {
+  const existing = document.getElementById('escrowModalOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'escrowModalOverlay';
+  overlay.className = 'escrow-modal-overlay';
+  overlay.innerHTML = `
+    <div class="escrow-modal">
+      <h2>🔒 طلب وسيط آمن</h2>
+      <p class="escrow-hint">رسوم الخدمة: 5 دينار أردني. أدخل رقم واتساب الطرف الآخر لإنشاء روم الوساطة.</p>
+      <label>أنا:</label>
+      <select id="escrowMyRole">
+        <option value="buyer">مشتري (سأشتري الحساب)</option>
+        <option value="seller">بائع (سأبيع الحساب)</option>
+      </select>
+      <label>رقم واتساب الطرف الآخر:</label>
+      <input type="tel" id="escrowOtherWhatsapp" placeholder="9627xxxxxxxx">
+      <label>رقم واتساب الخاص بي:</label>
+      <input type="tel" id="escrowMyWhatsapp" value="${escapeHtml(ownerWhatsapp || '')}">
+      <button onclick="createEscrowSession('${itemId}', '${escapeHtml(itemName || '')}')">إنشاء روم الوساطة</button>
+      <button class="escrow-cancel" onclick="closeEscrowModal()">إلغاء</button>
+      <div id="escrowResultBox"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function closeEscrowModal() {
+  const el = document.getElementById('escrowModalOverlay');
+  if (el) el.remove();
+}
+
+async function createEscrowSession(itemId, itemName) {
+  const myRole = document.getElementById('escrowMyRole').value;
+  const otherWhatsapp = document.getElementById('escrowOtherWhatsapp').value.trim();
+  const myWhatsapp = document.getElementById('escrowMyWhatsapp').value.trim();
+
+  if (!otherWhatsapp || !myWhatsapp) {
+    alert('يرجى تعبئة رقمي الواتساب');
+    return;
+  }
+
+  const sellerWhatsapp = myRole === 'seller' ? myWhatsapp : otherWhatsapp;
+  const buyerWhatsapp = myRole === 'buyer' ? myWhatsapp : otherWhatsapp;
+
+  try {
+    const res = await fetch('/api/escrow/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerWhatsapp, buyerWhatsapp, itemId, gameType: itemName })
+    });
+    const data = await res.json();
+    if (!data.success) { alert(data.error || 'تعذر إنشاء الجلسة'); return; }
+
+    const base = location.origin;
+    const sellerLink = `${base}/escrow-room.html?id=${data.id}&token=${data.sellerToken}&role=seller`;
+    const buyerLink = `${base}/escrow-room.html?id=${data.id}&token=${data.buyerToken}&role=buyer`;
+    const myLink = myRole === 'seller' ? sellerLink : buyerLink;
+    const otherLink = myRole === 'seller' ? buyerLink : sellerLink;
+    const otherWaMsg = encodeURIComponent(`مرحباً، تفضل رابط روم الوسيط الآمن لإتمام عملية "${itemName}":\n${otherLink}`);
+
+    document.getElementById('escrowResultBox').innerHTML = `
+      <div class="escrow-result">
+        <p>✅ تم إنشاء الروم بنجاح</p>
+        <p><strong>رابطك أنت:</strong></p>
+        <a href="${myLink}" target="_blank" class="escrow-link-btn">فتح الروم الخاص بي</a>
+        <p><strong>أرسل هذا الرابط للطرف الآخر:</strong></p>
+        <a href="https://wa.me/${otherWhatsapp.replace(/[^\d]/g,'')}?text=${otherWaMsg}" target="_blank" class="escrow-link-btn escrow-whatsapp-btn">📲 إرسال عبر واتساب</a>
+      </div>`;
+  } catch (e) {
+    console.error(e);
+    alert('تعذر إنشاء جلسة الوساطة');
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.innerText = str || '';
+  return div.innerHTML;
+}
