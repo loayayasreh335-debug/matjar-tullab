@@ -453,9 +453,6 @@ function renderCard(item) {
          💬 تواصل عبر واتساب
        </a>`;
 
-  const escrowHtml = (item.category === 'حسابات ألعاب' && !isOwner && !item.isSwapped)
-    ? `<button class="btn-escrow" onclick="openEscrowModal('${item.id}', '${escapeHtml(item.whatsapp)}', '${escapeHtml(item.name)}')">🔒 طلب وسيط آمن</button>`
-    : '';
 
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
@@ -780,6 +777,10 @@ function renderItemDetail(item) {
          </button>
          <button class="btn-delete" id="detailDeleteBtn">🗑️ حذف</button>
        </div>`
+    : '';
+
+  const escrowHtml = (item.category === 'حسابات ألعاب' && !isOwner && !item.isSwapped)
+    ? `<button class="btn-escrow" onclick="openEscrowModal('${item.id}', '${escapeHtml(item.whatsapp)}', '${escapeHtml(item.name)}')">🔒 طلب وسيط آمن</button>`
     : '';
 
   const universityBadgeDetail = item.university
