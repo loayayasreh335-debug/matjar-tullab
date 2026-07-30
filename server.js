@@ -15,6 +15,7 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // مدة صلاحية الإعلان قبل حذفه تلقائياً (بالمللي ثانية) = 30 يوماً
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
@@ -478,6 +479,7 @@ app.use((req, res) => {
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
+    require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD });
     app.listen(PORT, () => {
       console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
       cleanupExpiredItems();

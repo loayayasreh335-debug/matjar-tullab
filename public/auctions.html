@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>المزادات | متجر الطلاب</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Tahoma, Arial, sans-serif;
+    background: #f5f6f8;
+    color: #1f2430;
+    margin: 0;
+    padding: 0 16px 60px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  header a {
+    color: #ff7a1a;
+    text-decoration: none;
+    font-weight: 700;
+  }
+  h1 { font-size: 22px; margin: 0 auto; text-align: center; max-width: 900px; }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  .card-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+  }
+  .card-box h2 { font-size: 17px; margin: 0 0 14px; }
+
+  label { display: block; font-size: 13px; color: #555; margin: 12px 0 4px; }
+  input, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  textarea { min-height: 70px; resize: vertical; }
+
+  .btn {
+    background: #ff7a1a;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 16px;
+    width: 100%;
+  }
+  .btn:disabled { opacity: 0.6; }
+  .msg { font-size: 13px; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }
+  .msg.error { background: #fde8e8; color: #b42318; display: block; }
+  .msg.success { background: #e7f6ec; color: #1a7f37; display: block; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+  .auction-card {
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .auction-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    background: #eee;
+  }
+  .auction-body { padding: 14px; }
+  .auction-body h3 { margin: 0 0 6px; font-size: 16px; }
+  .auction-body p { margin: 0 0 10px; font-size: 13px; color: #6b7280; }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .price-row .current { font-weight: 700; color: #ff7a1a; font-size: 16px; }
+  .timer { font-size: 12px; color: #b42318; font-weight: 700; margin-bottom: 10px; }
+  .timer.ended { color: #6b7280; }
+
+  .bid-row { display: flex; gap: 8px; }
+  .bid-row input { flex: 1; }
+  .bid-row button {
+    background: #1f2430;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .empty { text-align: center; color: #9ca3af; padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">🏠 الصفحة الرئيسية</a>
+  <span></span>
+</header>
+
+<h1>🔨 المزادات</h1>
+
+<div class="container">
+
+  <div class="card-box">
+    <h2>➕ إنشاء مزاد جديد</h2>
+    <form id="auctionForm">
+      <label>عنوان المزاد *</label>
+      <input type="text" id="title" required maxlength="100">
+
+      <label>الوصف *</label>
+      <textarea id="description" required maxlength="500"></textarea>
+
+      <label>صورة (اختياري)</label>
+      <input type="file" id="image" accept="image/*">
+
+      <label>سعر بداية المزاد (دينار) *</label>
+      <input type="number" id="startingPrice" min="1" step="0.01" required>
+
+      <label>وقت انتهاء المزاد *</label>
+      <input type="datetime-local" id="endsAt" required>
+
+      <label>رقم الواتساب للتواصل *</label>
+      <input type="text" id="whatsapp" required placeholder="مثال: 962791234567">
+
+      <button type="submit" class="btn" id="submitBtn">إرسال المزاد للمراجعة</button>
+      <div class="msg" id="formMsg"></div>
+      <p style="font-size:12px;color:#9ca3af;margin-top:10px;">
+        ملاحظة: كل مزاد جديد يخضع للمراجعة اليدوية من إدارة المنصة قبل نشره للعامة (بما فيها رسوم النشر إن وُجدت).
+      </p>
+    </form>
+  </div>
+
+  <div class="card-box">
+    <h2>📋 المزادات النشطة حالياً</h2>
+    <div class="grid" id="auctionsGrid">
+      <p class="empty">جارِ التحميل...</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const grid = document.getElementById('auctionsGrid');
+const form = document.getElementById('auctionForm');
+const formMsg = document.getElementById('formMsg');
+const submitBtn = document.getElementById('submitBtn');
+
+function timeLeftText(endsAt) {
+  const diff = endsAt - Date.now();
+  if (diff <= 0) return { text: 'انتهى المزاد', ended: true };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  let text = '';
+  if (days > 0) text = `متبقي ${days} يوم ${hours} ساعة`;
+  else if (hours > 0) text = `متبقي ${hours} ساعة ${mins} دقيقة`;
+  else text = `متبقي ${mins} دقيقة ${secs} ثانية`;
+  return { text, ended: false };
+}
+
+function renderAuctionCard(a) {
+  const div = document.createElement('div');
+  div.className = 'auction-card';
+  div.dataset.endsAt = a.endsAt;
+
+  const imgHtml = a.imageUrl
+    ? `<img src="${a.imageUrl}" alt="${escapeHtml(a.title)}">`
+    : `<div style="height:160px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:40px;">🔨</div>`;
+
+  div.innerHTML = `
+    ${imgHtml}
+    <div class="auction-body">
+      <h3>${escapeHtml(a.title)}</h3>
+      <p>${escapeHtml(a.description)}</p>
+      <div class="price-row">
+        <span>السعر الحالي</span>
+        <span class="current">${a.currentBid} د.أ</span>
+      </div>
+      <div class="timer" data-ends="${a.endsAt}"></div>
+      <div class="bid-row">
+        <input type="number" min="${a.currentBid + 1}" placeholder="أدخل مبلغ أعلى من ${a.currentBid}" class="bidInput">
+        <button class="bidBtn">مزايدة</button>
+      </div>
+    </div>
+  `;
+
+  const bidBtn = div.querySelector('.bidBtn');
+  const bidInput = div.querySelector('.bidInput');
+  bidBtn.addEventListener('click', async () => {
+    const amount = parseFloat(bidInput.value);
+    if (!amount || amount <= a.currentBid) {
+      alert(`يجب أن تكون المزايدة أعلى من ${a.currentBid}`);
+      return;
+    }
+    bidBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/auctions/${a.id}/bid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'حدث خطأ');
+      loadAuctions();
+    } catch (err) {
+      alert(err.message);
+      bidBtn.disabled = false;
+    }
+  });
+
+  return div;
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+async function loadAuctions() {
+  try {
+    const res = await fetch('/api/auctions');
+    const auctions = await res.json();
+    grid.innerHTML = '';
+    if (!auctions.length) {
+      grid.innerHTML = '<p class="empty">لا يوجد مزادات نشطة حالياً</p>';
+      return;
+    }
+    auctions.forEach(a => grid.appendChild(renderAuctionCard(a)));
+    updateTimers();
+  } catch (err) {
+    grid.innerHTML = '<p class="empty">تعذر تحميل المزادات</p>';
+  }
+}
+
+function updateTimers() {
+  document.querySelectorAll('.timer').forEach(el => {
+    const endsAt = parseInt(el.dataset.ends, 10);
+    const { text, ended } = timeLeftText(endsAt);
+    el.textContent = text;
+    el.classList.toggle('ended', ended);
+  });
+}
+setInterval(updateTimers, 1000);
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  formMsg.className = 'msg';
+  formMsg.textContent = '';
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'جارِ الإرسال...';
+
+  try {
+    const fd = new FormData();
+    fd.append('title', document.getElementById('title').value);
+    fd.append('description', document.getElementById('description').value);
+    fd.append('startingPrice', document.getElementById('startingPrice').value);
+    fd.append('endsAt', document.getElementById('endsAt').value);
+    fd.append('whatsapp', document.getElementById('whatsapp').value);
+    const imageFile = document.getElementById('image').files[0];
+    if (imageFile) fd.append('image', imageFile);
+
+    const res = await fetch('/api/auctions', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'حدث خطأ أثناء الإرسال');
+
+    formMsg.className = 'msg success';
+    formMsg.textContent = '✅ تم إرسال المزاد بنجاح! رح يظهر للعامة بعد موافقة الإدارة.';
+    form.reset();
+  } catch (err) {
+    formMsg.className = 'msg error';
+    formMsg.textContent = '❌ ' + err.message;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'إرسال المزاد للمراجعة';
+  }
+});
+
+loadAuctions();
+</script>
+
+</body>
+</html>

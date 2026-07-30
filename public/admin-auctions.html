@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة تحكم المزادات | متجر الطلاب</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Tahoma, Arial, sans-serif;
+    background: #f5f6f8;
+    color: #1f2430;
+    margin: 0;
+    padding: 0 16px 60px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  header a { color: #ff7a1a; text-decoration: none; font-weight: 700; }
+  h1 { font-size: 20px; text-align: center; }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  #loginBox {
+    max-width: 320px;
+    margin: 60px auto;
+    background: #fff;
+    padding: 24px;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+  #loginBox input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  #loginBox button, .btn {
+    background: #ff7a1a;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #loginError { color: #b42318; font-size: 13px; min-height: 18px; }
+
+  #dashboard { display: none; }
+
+  .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+  .tab {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab.active { background: #ff7a1a; color: #fff; border-color: #ff7a1a; }
+
+  .auction-row {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .auction-row img {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: #eee;
+    flex-shrink: 0;
+  }
+  .auction-info { flex: 1; min-width: 200px; }
+  .auction-info h3 { margin: 0 0 4px; font-size: 15px; }
+  .auction-info p { margin: 0 0 4px; font-size: 13px; color: #6b7280; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .badge.pending { background: #fef3c7; color: #92400e; }
+  .badge.active { background: #dcfce7; color: #166534; }
+  .badge.rejected { background: #fde8e8; color: #b42318; }
+  .badge.ended { background: #e5e7eb; color: #374151; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-approve { background: #16a34a; color: #fff; }
+  .btn-reject { background: #eab308; color: #fff; }
+  .btn-delete { background: #dc2626; color: #fff; }
+  .empty { text-align: center; color: #9ca3af; padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">🏠 الصفحة الرئيسية</a>
+  <span></span>
+</header>
+
+<h1>🔧 لوحة تحكم المزادات</h1>
+
+<div id="loginBox">
+  <p>أدخل كلمة سر الأدمن للمتابعة</p>
+  <input type="password" id="passwordInput" placeholder="كلمة السر">
+  <div id="loginError"></div>
+  <button onclick="login()">دخول</button>
+</div>
+
+<div id="dashboard" class="container">
+  <div class="tabs">
+    <div class="tab active" data-status="pending">قيد المراجعة</div>
+    <div class="tab" data-status="active">منشورة</div>
+    <div class="tab" data-status="rejected">مرفوضة</div>
+    <div class="tab" data-status="">الكل</div>
+  </div>
+  <div id="list"><p class="empty">جارِ التحميل...</p></div>
+</div>
+
+<script>
+let adminPassword = sessionStorage.getItem('adminPassword') || '';
+let currentStatus = 'pending';
+
+if (adminPassword) {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadAuctions();
+}
+
+async function login() {
+  const password = document.getElementById('passwordInput').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error('كلمة السر غير صحيحة');
+
+    adminPassword = password;
+    sessionStorage.setItem('adminPassword', password);
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadAuctions();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentStatus = tab.dataset.status;
+    loadAuctions();
+  });
+});
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+const statusLabels = { pending: 'قيد المراجعة', active: 'منشور', rejected: 'مرفوض', ended: 'منتهي' };
+
+async function loadAuctions() {
+  const list = document.getElementById('list');
+  list.innerHTML = '<p class="empty">جارِ التحميل...</p>';
+  try {
+    const url = currentStatus ? `/api/admin/auctions?status=${currentStatus}` : '/api/admin/auctions';
+    const res = await fetch(url, { headers: { 'x-admin-password': adminPassword } });
+    if (res.status === 401) {
+      sessionStorage.removeItem('adminPassword');
+      location.reload();
+      return;
+    }
+    const auctions = await res.json();
+    if (!auctions.length) {
+      list.innerHTML = '<p class="empty">لا يوجد مزادات هنا حالياً</p>';
+      return;
+    }
+    list.innerHTML = '';
+    auctions.forEach(a => list.appendChild(renderRow(a)));
+  } catch (err) {
+    list.innerHTML = '<p class="empty">تعذر تحميل المزادات</p>';
+  }
+}
+
+function renderRow(a) {
+  const row = document.createElement('div');
+  row.className = 'auction-row';
+
+  const imgHtml = a.imageUrl
+    ? `<img src="${a.imageUrl}" alt="">`
+    : `<div style="width:90px;height:90px;background:#eee;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🔨</div>`;
+
+  const endsAtStr = new Date(a.endsAt).toLocaleString('ar-EG');
+
+  row.innerHTML = `
+    ${imgHtml}
+    <div class="auction-info">
+      <span class="badge ${a.status}">${statusLabels[a.status] || a.status}</span>
+      <h3>${escapeHtml(a.title)}</h3>
+      <p>${escapeHtml(a.description)}</p>
+      <p>💰 السعر الحالي: <strong>${a.currentBid} د.أ</strong> (بداية: ${a.startingPrice} د.أ، عدد المزايدات: ${a.bidsCount})</p>
+      <p>⏰ ينتهي: ${endsAtStr}</p>
+      <p>📱 واتساب: ${escapeHtml(a.whatsapp)}</p>
+    </div>
+    <div class="actions"></div>
+  `;
+
+  const actions = row.querySelector('.actions');
+
+  if (a.status === 'pending') {
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'btn-approve';
+    approveBtn.textContent = '✅ تفعيل ونشر';
+    approveBtn.onclick = () => approveAuction(a.id);
+    actions.appendChild(approveBtn);
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'btn-reject';
+    rejectBtn.textContent = '⛔ رفض';
+    rejectBtn.onclick = () => rejectAuction(a.id);
+    actions.appendChild(rejectBtn);
+  }
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn-delete';
+  deleteBtn.textContent = '🗑️ حذف نهائي';
+  deleteBtn.onclick = () => deleteAuction(a.id);
+  actions.appendChild(deleteBtn);
+
+  return row;
+}
+
+async function approveAuction(id) {
+  if (!confirm('تأكيد استلام الرسوم وتفعيل المزاد للنشر العام؟')) return;
+  await adminAction(`/api/admin/auctions/${id}/approve`, 'PATCH');
+}
+
+async function rejectAuction(id) {
+  if (!confirm('تأكيد رفض هذا المزاد؟')) return;
+  await adminAction(`/api/admin/auctions/${id}/reject`, 'PATCH');
+}
+
+async function deleteAuction(id) {
+  if (!confirm('تأكيد الحذف النهائي؟ هذا الإجراء لا يمكن التراجع عنه.')) return;
+  await adminAction(`/api/admin/auctions/${id}`, 'DELETE');
+}
+
+async function adminAction(url, method) {
+  try {
+    const res = await fetch(url, { method, headers: { 'x-admin-password': adminPassword } });
+    if (res.status === 401) {
+      sessionStorage.removeItem('adminPassword');
+      location.reload();
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'حدث خطأ');
+    loadAuctions();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+</script>
+
+</body>
+</html>
