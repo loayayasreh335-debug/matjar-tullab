@@ -113,6 +113,49 @@
             color: #fff;
         }
         .hidden { display: none; }
+        .section-title {
+            font-size: 22px;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .escrow-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .escrow-card {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 18px;
+            border-right: 4px solid #6f42c1;
+        }
+        .escrow-card p { color: #ddd; font-size: 14px; margin-bottom: 6px; }
+        .escrow-card .proof-img {
+            width: 100%;
+            max-height: 180px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin: 10px 0;
+            background: rgba(0,0,0,0.3);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status-PENDING_PAYMENT { background: #ffc107; color: #000; }
+        .status-PAYMENT_VERIFIED { background: #17a2b8; color: #fff; }
+        .status-DATA_SUBMITTED { background: #6f42c1; color: #fff; }
+        .status-AWAITING_BOTH_CONFIRM { background: #fd7e14; color: #fff; }
+        .status-COMPLETED { background: #28a745; color: #fff; }
+        .empty-msg { text-align:center; grid-column:1/-1; color:#aaa; padding:20px; }
     </style>
 </head>
 <body>
@@ -127,7 +170,7 @@
     <div id="dashboardScreen" class="container hidden">
         <div class="header">
             <h1>🛠️ لوحة تحكم المطور</h1>
-            <p>حذف الإعلانات - متجر الطلاب</p>
+            <p>إدارة الإعلانات وطلبات الوسيط - متجر الطلاب</p>
             <button class="btn btn-danger" onclick="logout()" style="margin-top:15px;">🚪 خروج</button>
         </div>
 
@@ -144,6 +187,12 @@
         </div>
 
         <div class="ads-grid" id="adsContainer"></div>
+
+        <div class="section-title">
+            <span>🤝 طلبات الوسيط المعلّقة</span>
+            <button class="btn btn-primary" onclick="loadEscrowSessions()" style="padding:8px 20px;font-size:14px;">🔄 تحديث</button>
+        </div>
+        <div class="escrow-grid" id="escrowContainer"></div>
     </div>
 
     <script src="admin.js"></script>
