@@ -78,7 +78,6 @@ const UNIVERSITY_RELATED_CATEGORIES = ['كتب دراسية', 'قرطاسية و
 const DEVELOPER_WHATSAPP = '962771587863';
 
 // صورة افتراضية تُستخدم تلقائياً عندما لا يرفع المستخدم أي صورة للإعلان
-// (نص إنجليزي بسيط فقط بالرابط - خدمة placehold.co لا تدعم عرض الخطوط العربية بشكل صحيح)
 const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/800x600/e5e7eb/6b7280?text=No+Image';
 
 // أنواع الإعلان المتاحة
@@ -96,14 +95,13 @@ const mongoClient = new MongoClient(MONGODB_URI);
 
 async function connectDB() {
   await mongoClient.connect();
-  db = mongoClient.db(); // اسم القاعدة يُقرأ من نهاية رابط الاتصال نفسه
+  db = mongoClient.db();
   await db.collection('items').createIndex({ id: 1 }, { unique: true });
   await db.collection('items').createIndex({ createdAt: -1 });
   console.log('✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح');
 }
 
 // ---------- إعداد Cloudinary (تخزين الصور الدائم) ----------
-// يقرأ تلقائياً متغير البيئة CLOUDINARY_URL إن وُجد
 if (!process.env.CLOUDINARY_URL) {
   console.error('❌ خطأ: متغير البيئة CLOUDINARY_URL غير موجود. راجع ملف .env أو إعدادات Render.');
   process.exit(1);
@@ -134,7 +132,6 @@ async function deleteImagesFromCloudinary(publicIds) {
 
 // ---------- دوال مساعدة ----------
 
-// توحيد شكل الإعلان (يدعم إعلانات قديمة إن وُجدت)
 function normalizeItem(item) {
   if (!item.imageUrls) item.imageUrls = [];
   if (!item.imagePublicIds) item.imagePublicIds = [];
@@ -142,20 +139,18 @@ function normalizeItem(item) {
   if (!item.gameType) item.gameType = '';
   if (!item.governorate) item.governorate = '';
   if (!item.area) item.area = '';
-  if (!item.adType) item.adType = 'barter'; // الإعلانات القديمة كلها كانت مقايضة قبل هذه الميزة
+  if (!item.adType) item.adType = 'barter';
   if (typeof item.price !== 'number') item.price = null;
   if (typeof item.views !== 'number') item.views = 0;
   if (typeof item.isSwapped !== 'boolean') item.isSwapped = false;
   return item;
 }
 
-// إخفاء الحقول الحساسة قبل إرسال الإعلان للعميل
 function toPublicItem(item) {
   const { ownerToken, imagePublicIds, _id, ...publicItem } = item;
   return publicItem;
 }
 
-// حذف الإعلانات المنتهية (أقدم من 30 يوماً) مع صورها من Cloudinary
 async function cleanupExpiredItems() {
   const cutoff = Date.now() - EXPIRY_MS;
   const expired = await db.collection('items').find({ createdAt: { $lt: cutoff } }).toArray();
@@ -169,9 +164,8 @@ async function cleanupExpiredItems() {
   }
 }
 
-// حد أقصى لعدد الإعلانات المسموح نشرها من نفس الجهاز خلال 24 ساعة (حماية بسيطة من السبام)
 const DAILY_POST_LIMIT = 5;
-const deviceLimitTracker = new Map(); // deviceId => [timestamps]
+const deviceLimitTracker = new Map();
 
 function isRateLimited(deviceId) {
   if (!deviceId) return false;
@@ -189,7 +183,6 @@ function recordPost(deviceId) {
   deviceLimitTracker.set(deviceId, timestamps);
 }
 
-// ---------- إعداد رفع الصور (Multer في الذاكرة - بدون حفظ محلي) ----------
 function fileFilter(req, file, cb) {
   const allowed = /jpeg|jpg|png|gif|webp/;
   const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
@@ -204,12 +197,9 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// ---------- الميدلوير العام ----------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// ---------- المسارات (API Routes) ----------
 
 app.get('/api/universities', (req, res) => res.json(JORDAN_UNIVERSITIES));
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
@@ -317,7 +307,6 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
       return res.status(400).json({ error: 'يرجى اختيار نوع اللعبة' });
     }
 
-    // رفع الصور إلى Cloudinary (اختياري تماماً - لو ما رفع المستخدم أي صورة نستخدم صورة افتراضية)
     const uploaded = await Promise.all(
       (req.files || []).map(f => uploadImageToCloudinary(f.buffer))
     );
@@ -339,7 +328,7 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
       governorate: governorate.trim(),
       area: area.trim(),
       imageUrls: uploaded.length ? uploaded.map(u => u.url) : [PLACEHOLDER_IMAGE_URL],
-      imagePublicIds: uploaded.map(u => u.publicId), // فاضية لو استخدمنا الصورة الافتراضية (لا شيء نحذفه من Cloudinary لاحقاً)
+      imagePublicIds: uploaded.map(u => u.publicId),
       createdAt: Date.now(),
       isSwapped: false,
       views: 0,
@@ -395,7 +384,6 @@ app.delete('/api/items/:id', async (req, res) => {
   }
 });
 
-// تهريب النصوص قبل إدراجها داخل خصائص HTML
 function escapeAttr(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -437,50 +425,51 @@ app.get('/university/:name', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// معالجة أخطاء Multer
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError || err) {
-    return res.status(400).json({ error: err.message });
-  }
-  next();
-});
-
-// صفحة 404 مخصصة
-app.use((req, res) => {
-  res.status(404).send(`
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>الصفحة غير موجودة | متجر الطلاب</title>
-      <style>
-        body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
-               display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
-        .box { max-width:380px; }
-        .emoji { font-size:60px; margin-bottom:10px; }
-        h1 { font-size:20px; margin:0 0 10px; }
-        p { color:#6b7280; font-size:14px; margin:0 0 20px; }
-        a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
-      </style>
-    </head>
-    <body>
-      <div class="box">
-        <div class="emoji">🔍📦</div>
-        <h1>هاي الصفحة مش موجودة</h1>
-        <p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
-        <a href="/">🏠 الصفحة الرئيسية</a>
-      </div>
-    </body>
-    </html>
-  `);
-});
-
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD });
-  require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary });
+    require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary });
+
+    // معالجة أخطاء Multer
+    app.use((err, req, res, next) => {
+      if (err instanceof multer.MulterError || err) {
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+
+    // صفحة 404 مخصصة
+    app.use((req, res) => {
+      res.status(404).send(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>الصفحة غير موجودة | متجر الطلاب</title>
+          <style>
+            body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
+                   display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
+            .box { max-width:380px; }
+            .emoji { font-size:60px; margin-bottom:10px; }
+            h1 { font-size:20px; margin:0 0 10px; }
+            p { color:#6b7280; font-size:14px; margin:0 0 20px; }
+            a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <div class="emoji">🔍📦</div>
+            <h1>هاي الصفحة مش موجودة</h1>
+            <p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
+            <a href="/">🏠 الصفحة الرئيسية</a>
+          </div>
+        </body>
+        </html>
+      `);
+    });
+
     app.listen(PORT, () => {
       console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
       cleanupExpiredItems();
@@ -491,4 +480,3 @@ connectDB()
     console.error('❌ فشل الاتصال بقاعدة البيانات:', err.message);
     process.exit(1);
   });
-
