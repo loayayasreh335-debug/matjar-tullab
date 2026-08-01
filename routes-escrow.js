@@ -1,5 +1,9 @@
 // routes-escrow.js
-// نظام الوسيط الآمن (Escrow) لتبادل حسابات الألعاب - تحقق يدوي من الأدمن
+// نظام الوسيط الآمن (Escrow) الكامل - الفلوس تمر عبر الأدمن لحماية الطرفين
+// التدفق: دفع (سعر الحساب + 5 رسوم) للأدمن -> تحقق الأدمن -> البائع يدخل البيانات
+// -> تنكشف فوراً للمشتري -> المشتري يجرب ويأكد أو يبلغ عن مشكلة
+// -> لو أكد: الأدمن يحول سعر الحساب للبائع | لو أبلغ: الأدمن يراجع ويقرر
+
 const cryptoNode = require('crypto');
 
 module.exports = function registerEscrowRoutes(app, ctx) {
@@ -54,13 +58,28 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     return crypto.randomBytes(16).toString('hex');
   }
 
+  function pushMessage(sessionId, text) {
+    return db.collection('escrowSessions').updateOne(
+      { id: sessionId },
+      { $push: { messages: { senderRole: 'bot', text, createdAt: Date.now() } } }
+    );
+  }
+
   // ---------- إنشاء جلسة وساطة جديدة ----------
   app.post('/api/escrow/create', async (req, res) => {
     try {
-      const { sellerWhatsapp, buyerWhatsapp, gameType, itemId } = req.body;
+      const { sellerWhatsapp, buyerWhatsapp, gameType, itemId, dealAmount } = req.body;
       if (!sellerWhatsapp || !buyerWhatsapp) {
         return res.status(400).json({ error: 'يرجى إدخال أرقام واتساب البائع والمشتري' });
       }
+      const parsedDeal = parseFloat(dealAmount);
+      if (isNaN(parsedDeal) || parsedDeal <= 0) {
+        return res.status(400).json({ error: 'يرجى إدخال سعر صحيح للحساب المتفق عليه' });
+      }
+
+      const feeAmount = 5;
+      const totalDue = Math.round((parsedDeal + feeAmount) * 100) / 100;
+
       const session = {
         id: genId(),
         sellerWhatsapp: sellerWhatsapp.trim(),
@@ -68,15 +87,24 @@ module.exports = function registerEscrowRoutes(app, ctx) {
         gameType: gameType || '',
         itemId: itemId || null,
         status: 'PENDING_PAYMENT',
-        feeAmount: 5,
+        dealAmount: parsedDeal,
+        feeAmount,
+        totalDue,
         sellerToken: genToken(),
         buyerToken: genToken(),
         paymentProof: null,
         credentials: null,
+        disputeReason: null,
+        sellerPaid: false,
         confirmations: { sellerConfirmed: false, buyerConfirmed: false },
-        messages: [{ senderRole: 'bot', text: 'مرحباً بكما في روم الوسيط الآمن. يرجى دفع رسوم الخدمة (5 دينار) عبر CliQ أو Orange Money وإرفاق صورة الإشعار.', createdAt: Date.now() }],
+        messages: [{
+          senderRole: 'bot',
+          text: `مرحباً بكما في روم الوسيط الآمن. المبلغ الإجمالي المطلوب تحويله للأدمن: ${totalDue} دينار (${parsedDeal} دينار سعر الحساب + ${feeAmount} دينار رسوم الخدمة). يرجى التحويل عبر CliQ أو Orange Money وإرفاق صورة الإشعار.`,
+          createdAt: Date.now()
+        }],
         createdAt: Date.now()
       };
+
       await db.collection('escrowSessions').insertOne(session);
       res.status(201).json({
         success: true,
@@ -101,7 +129,26 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     }
   });
 
-  // ---------- إرسال إثبات الدفع (صورة الإشعار) - يُخزن على Cloudinary ----------
+  // ---------- جلب بيانات الحساب المكشوفة (المشتري فقط) ----------
+  app.get('/api/escrow/:id/credentials', async (req, res) => {
+    try {
+      const { token } = req.query;
+      const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
+      if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (token !== session.buyerToken) return res.status(403).json({ error: 'رمز غير صحيح' });
+      if (!session.credentials || !session.credentials.encryptedPayload || !session.credentials.revealedToBuyer) {
+        return res.status(400).json({ error: 'بيانات الحساب غير متاحة بعد' });
+      }
+      if (!ENC_KEY) return res.status(500).json({ error: 'مفتاح التشفير غير مهيأ على السيرفر' });
+      const decrypted = decryptCreds(session.credentials.encryptedPayload);
+      res.json({ success: true, credentials: decrypted });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'تعذر جلب بيانات الحساب' });
+    }
+  });
+
+  // ---------- إرسال إثبات الدفع (صورة الإشعار) ----------
   app.post('/api/escrow/:id/pay', ctx.upload.single('proof'), async (req, res) => {
     try {
       const { token, method } = req.body;
@@ -117,11 +164,9 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       }
       await db.collection('escrowSessions').updateOne(
         { id: req.params.id },
-        {
-          $set: { paymentProof: { method: method || 'CLIQ', screenshotUrl, submittedAt: Date.now() } },
-          $push: { messages: { senderRole: 'bot', text: 'تم استلام إشعار الدفع، بانتظار تأكيد الأدمن.', createdAt: Date.now() } }
-        }
+        { $set: { paymentProof: { method: method || 'CLIQ', screenshotUrl, submittedAt: Date.now() } } }
       );
+      await pushMessage(req.params.id, 'تم استلام إشعار الدفع، بانتظار تأكيد الأدمن.');
       res.json({ success: true });
     } catch (err) {
       console.error(err);
@@ -134,20 +179,21 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     try {
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (session.status !== 'PENDING_PAYMENT') {
+        return res.status(400).json({ error: 'الجلسة ليست بانتظار تحقق الدفع' });
+      }
       await db.collection('escrowSessions').updateOne(
         { id: req.params.id },
-        {
-          $set: { status: 'PAYMENT_VERIFIED' },
-          $push: { messages: { senderRole: 'bot', text: 'تم تأكيد الدفع ✅. البائع، الرجاء إدخال بيانات الحساب الآن.', createdAt: Date.now() } }
-        }
+        { $set: { status: 'PAYMENT_VERIFIED' } }
       );
+      await pushMessage(req.params.id, 'تم تأكيد الدفع ✅. البائع، الرجاء إدخال بيانات الحساب الآن.');
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: 'تعذر تأكيد الدفع' });
     }
   });
 
-  // ---------- تسليم بيانات الحساب (البائع فقط) ----------
+  // ---------- تسليم بيانات الحساب (البائع فقط) - تنكشف فوراً للمشتري ----------
   app.post('/api/escrow/:id/submit-credentials', async (req, res) => {
     try {
       const { token, email, password, otpNote } = req.body;
@@ -156,15 +202,19 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (token !== session.sellerToken) return res.status(403).json({ error: 'البائع فقط يمكنه إدخال بيانات الحساب' });
       if (session.status !== 'PAYMENT_VERIFIED') return res.status(400).json({ error: 'الدفع لم يُؤكد بعد من الأدمن' });
       if (!ENC_KEY) return res.status(500).json({ error: 'مفتاح التشفير غير مهيأ على السيرفر' });
+      if (!email || !password) return res.status(400).json({ error: 'يرجى تعبئة الإيميل وكلمة السر' });
 
       const encryptedPayload = encryptCreds({ email, password, otpNote: otpNote || '' });
       await db.collection('escrowSessions').updateOne(
         { id: req.params.id },
         {
-          $set: { status: 'DATA_SUBMITTED', credentials: { encryptedPayload, submittedAt: Date.now(), revealedToBuyer: false } },
-          $push: { messages: { senderRole: 'bot', text: 'تم استلام بيانات الحساب وتشفيرها. المشتري، عند تأكدك من استلام المبلغ اضغط "تم الاستلام بنجاح".', createdAt: Date.now() } }
+          $set: {
+            status: 'DATA_SUBMITTED',
+            credentials: { encryptedPayload, submittedAt: Date.now(), revealedToBuyer: true, revealedAt: Date.now() }
+          }
         }
       );
+      await pushMessage(req.params.id, 'تم استلام بيانات الحساب. المشتري، جرّب الدخول الآن على الحساب، وبعد التأكد اضغط "تم الاستلام والرضا" أو "الإبلاغ عن مشكلة" إذا في خطأ بالبيانات.');
       res.json({ success: true });
     } catch (err) {
       console.error(err);
@@ -172,65 +222,101 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     }
   });
 
-  // ---------- تأكيد الاستلام من الطرفين ----------
-  app.post('/api/escrow/:id/complete', async (req, res) => {
+  // ---------- المشتري: تأكيد الاستلام والرضا عن الحساب ----------
+  app.post('/api/escrow/:id/confirm-receipt', async (req, res) => {
     try {
       const { token } = req.body;
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (token !== session.buyerToken) return res.status(403).json({ error: 'المشتري فقط يمكنه تأكيد الاستلام' });
+      if (session.status !== 'DATA_SUBMITTED') return res.status(400).json({ error: 'لا يمكن التأكيد بهذه المرحلة' });
 
-      const isSeller = token === session.sellerToken;
-      const isBuyer = token === session.buyerToken;
-      if (!isSeller && !isBuyer) return res.status(403).json({ error: 'رمز غير صحيح' });
-
-      const confirmations = { ...session.confirmations };
-      if (isSeller) confirmations.sellerConfirmed = true;
-      if (isBuyer) confirmations.buyerConfirmed = true;
-
-      let newStatus = session.status;
-      let revealedCredentials = null;
-
-      if (confirmations.sellerConfirmed && confirmations.buyerConfirmed) {
-        newStatus = 'COMPLETED';
-        if (session.credentials && session.credentials.encryptedPayload) {
-          revealedCredentials = decryptCreds(session.credentials.encryptedPayload);
-        }
-        await db.collection('escrowSessions').updateOne(
-          { id: req.params.id },
-          {
-            $set: {
-              status: newStatus,
-              confirmations,
-              'credentials.revealedToBuyer': true,
-              'credentials.revealedAt': Date.now()
-            },
-            $push: { messages: { senderRole: 'bot', text: 'تمت العملية بنجاح ✅ وتم كشف بيانات الحساب للمشتري.', createdAt: Date.now() } }
-          }
-        );
-      } else {
-        newStatus = 'AWAITING_BOTH_CONFIRM';
-        await db.collection('escrowSessions').updateOne(
-          { id: req.params.id },
-          { $set: { status: newStatus, confirmations } }
-        );
-      }
-
-      const responsePayload = { success: true, status: newStatus };
-      if (revealedCredentials && isBuyer) {
-        responsePayload.credentials = revealedCredentials;
-      }
-      res.json(responsePayload);
+      await db.collection('escrowSessions').updateOne(
+        { id: req.params.id },
+        { $set: { status: 'PAYOUT_PENDING', 'confirmations.buyerConfirmed': true } }
+      );
+      await pushMessage(req.params.id, 'المشتري أكد استلام الحساب بنجاح ✅. الأدمن بيحول سعر الحساب للبائع الآن.');
+      res.json({ success: true });
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'تعذر إتمام العملية' });
+      res.status(500).json({ error: 'تعذر تأكيد الاستلام' });
     }
   });
 
-  // ---------- (أدمن) كل الجلسات المعلقة ----------
+  // ---------- المشتري: الإبلاغ عن مشكلة بالحساب ----------
+  app.post('/api/escrow/:id/report-issue', async (req, res) => {
+    try {
+      const { token, reason } = req.body;
+      const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
+      if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (token !== session.buyerToken) return res.status(403).json({ error: 'المشتري فقط يمكنه الإبلاغ عن مشكلة' });
+      if (session.status !== 'DATA_SUBMITTED') return res.status(400).json({ error: 'لا يمكن الإبلاغ بهذه المرحلة' });
+      if (!reason || !reason.trim()) return res.status(400).json({ error: 'يرجى كتابة سبب المشكلة' });
+
+      await db.collection('escrowSessions').updateOne(
+        { id: req.params.id },
+        { $set: { status: 'DISPUTED', disputeReason: reason.trim().slice(0, 500) } }
+      );
+      await pushMessage(req.params.id, '⚠️ المشتري أبلغ عن مشكلة بالحساب. الجلسة الآن قيد المراجعة من فريق الإدارة، ولن يتم تحويل أي مبلغ للبائع لحد ما تتحل المشكلة.');
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'تعذر إرسال البلاغ' });
+    }
+  });
+
+  // ---------- (أدمن) تأكيد تحويل سعر الحساب للبائع - إغلاق الصفقة بنجاح ----------
+  app.post('/api/admin/escrow/:id/mark-paid-seller', requireAdmin, async (req, res) => {
+    try {
+      const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
+      if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (session.status !== 'PAYOUT_PENDING') return res.status(400).json({ error: 'الجلسة ليست بانتظار تحويل للبائع' });
+
+      await db.collection('escrowSessions').updateOne(
+        { id: req.params.id },
+        { $set: { status: 'COMPLETED', sellerPaid: true } }
+      );
+      await pushMessage(req.params.id, '🎉 تم تحويل المبلغ للبائع، واكتملت الصفقة بنجاح. شكراً لاستخدامكم خدمة الوسيط الآمن.');
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'تعذر تأكيد التحويل' });
+    }
+  });
+
+  // ---------- (أدمن) حل النزاع: إتمام الصفقة أو استرجاع المبلغ للمشتري ----------
+  app.post('/api/admin/escrow/:id/resolve-dispute', requireAdmin, async (req, res) => {
+    try {
+      const { resolution } = req.body; // 'proceed' | 'refund'
+      const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
+      if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (session.status !== 'DISPUTED') return res.status(400).json({ error: 'الجلسة ليست بحالة نزاع' });
+
+      if (resolution === 'proceed') {
+        await db.collection('escrowSessions').updateOne(
+          { id: req.params.id },
+          { $set: { status: 'PAYOUT_PENDING' } }
+        );
+        await pushMessage(req.params.id, 'تمت مراجعة البلاغ من الإدارة، وتقرر إتمام الصفقة. جاري تحويل المبلغ للبائع.');
+      } else if (resolution === 'refund') {
+        await db.collection('escrowSessions').updateOne(
+          { id: req.params.id },
+          { $set: { status: 'REFUNDED' } }
+        );
+        await pushMessage(req.params.id, 'تمت مراجعة البلاغ من الإدارة، وتقرر استرجاع كامل المبلغ للمشتري. تم إلغاء الصفقة.');
+      } else {
+        return res.status(400).json({ error: 'قيمة resolution غير صحيحة' });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'تعذر حل النزاع' });
+    }
+  });
+
+  // ---------- (أدمن) كل الجلسات المعلقة (تحتاج إجراء) ----------
   app.get('/api/admin/escrow/pending', requireAdmin, async (req, res) => {
     try {
       const sessions = await db.collection('escrowSessions')
-        .find({ status: { $in: ['PENDING_PAYMENT', 'PAYMENT_VERIFIED', 'DATA_SUBMITTED', 'AWAITING_BOTH_CONFIRM'] } })
+        .find({ status: { $in: ['PENDING_PAYMENT', 'PAYMENT_VERIFIED', 'DATA_SUBMITTED', 'PAYOUT_PENDING', 'DISPUTED'] } })
         .sort({ createdAt: -1 })
         .toArray();
       res.json({ success: true, sessions: sessions.map(toPublicSession) });

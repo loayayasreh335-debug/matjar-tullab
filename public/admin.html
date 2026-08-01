@@ -54,6 +54,7 @@
         .btn-primary { background: #6f42c1; color: #fff; }
         .btn-danger { background: #dc3545; color: #fff; }
         .btn-success { background: #28a745; color: #fff; }
+        .btn-info { background: #17a2b8; color: #fff; }
         .btn:hover { opacity: 0.8; transform: translateY(-2px); }
         .stats {
             display: grid;
@@ -153,9 +154,14 @@
         .status-PENDING_PAYMENT { background: #ffc107; color: #000; }
         .status-PAYMENT_VERIFIED { background: #17a2b8; color: #fff; }
         .status-DATA_SUBMITTED { background: #6f42c1; color: #fff; }
-        .status-AWAITING_BOTH_CONFIRM { background: #fd7e14; color: #fff; }
+        .status-PAYOUT_PENDING { background: #0ea5e9; color: #fff; }
+        .status-DISPUTED { background: #dc3545; color: #fff; }
         .status-COMPLETED { background: #28a745; color: #fff; }
+        .status-REFUNDED { background: #6c757d; color: #fff; }
         .empty-msg { text-align:center; grid-column:1/-1; color:#aaa; padding:20px; }
+        .dispute-box { background: rgba(220,53,69,0.15); border: 1px solid #dc3545; padding: 10px; border-radius: 8px; margin: 8px 0; font-size: 13px; }
+        .escrow-card .actions { display: flex; gap: 8px; margin-top: 10px; }
+        .escrow-card .actions .btn { flex: 1; padding: 10px; font-size: 13px; }
     </style>
 </head>
 <body>

@@ -96,11 +96,13 @@ async function deleteAd(itemId) {
 }
 
 const ESCROW_STATUS_LABELS = {
-    PENDING_PAYMENT: '⏳ بانتظار دفع الرسوم',
+    PENDING_PAYMENT: '⏳ بانتظار دفع المبلغ',
     PAYMENT_VERIFIED: '✅ تم تأكيد الدفع - بانتظار بيانات البائع',
-    DATA_SUBMITTED: '📩 تم استلام بيانات الحساب - بانتظار تأكيد الطرفين',
-    AWAITING_BOTH_CONFIRM: '🤝 بانتظار تأكيد الاستلام من الطرفين',
-    COMPLETED: '🎉 مكتملة'
+    DATA_SUBMITTED: '📩 تم كشف البيانات للمشتري - بانتظار رده',
+    PAYOUT_PENDING: '💸 بانتظار تحويلك للبائع',
+    DISPUTED: '⚠️ نزاع - يحتاج قرارك',
+    COMPLETED: '🎉 مكتملة',
+    REFUNDED: '↩️ مُسترجعة'
 };
 
 async function loadEscrowSessions() {
@@ -127,16 +129,34 @@ async function loadEscrowSessions() {
             const proofImg = s.paymentProof && s.paymentProof.screenshotUrl
                 ? `<img class="proof-img" src="${s.paymentProof.screenshotUrl}" alt="إثبات الدفع">`
                 : '<p>لا يوجد إثبات دفع مرفوع بعد</p>';
-            const showConfirmBtn = s.status === 'PENDING_PAYMENT' && s.paymentProof;
+
+            let actionsHtml = '';
+            if (s.status === 'PENDING_PAYMENT' && s.paymentProof) {
+                actionsHtml = `<div class="actions"><button class="btn btn-success" onclick="verifyPayment('${s.id}')">✅ تأكيد استلام الدفع</button></div>`;
+            } else if (s.status === 'PAYOUT_PENDING') {
+                actionsHtml = `<div class="actions"><button class="btn btn-info" onclick="markPaidSeller('${s.id}')">💸 أكدت تحويل ${s.dealAmount} د للبائع</button></div>`;
+            } else if (s.status === 'DISPUTED') {
+                actionsHtml = `<div class="actions">
+                    <button class="btn btn-success" onclick="resolveDispute('${s.id}', 'proceed')">✅ إتمام الصفقة</button>
+                    <button class="btn btn-danger" onclick="resolveDispute('${s.id}', 'refund')">↩️ استرجاع للمشتري</button>
+                </div>`;
+            }
+
+            const disputeBox = (s.status === 'DISPUTED' && s.disputeReason)
+                ? `<div class="dispute-box">⚠️ سبب البلاغ: ${s.disputeReason}</div>`
+                : '';
+
             return `
                 <div class="escrow-card">
                     <span class="status-badge status-${s.status}">${statusLabel}</span>
                     <p>🎮 نوع اللعبة: ${s.gameType || 'غير محدد'}</p>
                     <p>👤 البائع (واتساب): ${s.sellerWhatsapp}</p>
                     <p>👤 المشتري (واتساب): ${s.buyerWhatsapp}</p>
-                    <p>💵 الرسوم: ${s.feeAmount} دينار</p>
+                    <p>💰 سعر الحساب: ${s.dealAmount} دينار</p>
+                    <p>💵 الإجمالي المطلوب: ${s.totalDue} دينار (شامل 5 د رسوم)</p>
+                    ${disputeBox}
                     ${proofImg}
-                    ${showConfirmBtn ? `<button class="btn btn-success" style="width:100%;margin-top:10px;" onclick="confirmEscrowPayment('${s.id}')">✅ تأكيد استلام الدفع</button>` : ''}
+                    ${actionsHtml}
                 </div>
             `;
         }).join('');
@@ -146,15 +166,12 @@ async function loadEscrowSessions() {
     }
 }
 
-async function confirmEscrowPayment(sessionId) {
-    if (!confirm('هل تأكدت من استلام مبلغ الـ5 دينار فعلياً؟')) return;
+async function verifyPayment(sessionId) {
+    if (!confirm('هل تأكدت من استلام المبلغ الإجمالي فعلياً؟')) return;
     try {
         const response = await fetch(`/api/admin/escrow/${sessionId}/verify-payment`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-password': ADMIN_PASSWORD
-            },
+            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
             body: JSON.stringify({})
         });
         if (response.ok) {
@@ -163,6 +180,49 @@ async function confirmEscrowPayment(sessionId) {
         } else {
             const err = await response.json().catch(() => ({}));
             alert('❌ ' + (err.error || 'فشل تأكيد الدفع'));
+        }
+    } catch (err) {
+        alert('❌ خطأ في الاتصال');
+    }
+}
+
+async function markPaidSeller(sessionId) {
+    if (!confirm('هل حوّلت فعلياً سعر الحساب للبائع خارج النظام (CliQ/Orange)؟ هذا الإجراء يغلق الصفقة نهائياً.')) return;
+    try {
+        const response = await fetch(`/api/admin/escrow/${sessionId}/mark-paid-seller`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            body: JSON.stringify({})
+        });
+        if (response.ok) {
+            alert('🎉 تم إغلاق الصفقة بنجاح');
+            loadEscrowSessions();
+        } else {
+            const err = await response.json().catch(() => ({}));
+            alert('❌ ' + (err.error || 'فشل تأكيد التحويل'));
+        }
+    } catch (err) {
+        alert('❌ خطأ في الاتصال');
+    }
+}
+
+async function resolveDispute(sessionId, resolution) {
+    const confirmMsg = resolution === 'proceed'
+        ? 'هل تأكدت إن الحساب صحيح ولا مشكلة فيه؟ سيتم المتابعة لتحويل المبلغ للبائع.'
+        : 'هل قررت استرجاع كامل المبلغ للمشتري وإلغاء الصفقة؟';
+    if (!confirm(confirmMsg)) return;
+    try {
+        const response = await fetch(`/api/admin/escrow/${sessionId}/resolve-dispute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            body: JSON.stringify({ resolution })
+        });
+        if (response.ok) {
+            alert('✅ تم تنفيذ القرار');
+            loadEscrowSessions();
+        } else {
+            const err = await response.json().catch(() => ({}));
+            alert('❌ ' + (err.error || 'فشل تنفيذ القرار'));
         }
     } catch (err) {
         alert('❌ خطأ في الاتصال');

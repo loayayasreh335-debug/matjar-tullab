@@ -973,7 +973,7 @@ function openEscrowModal(itemId, ownerWhatsapp, itemName) {
   overlay.innerHTML = `
     <div class="escrow-modal">
       <h2>🔒 طلب وسيط آمن</h2>
-      <p class="escrow-hint">رسوم الخدمة: 5 دينار أردني. أدخل رقم واتساب الطرف الآخر لإنشاء روم الوساطة.</p>
+      <p class="escrow-hint">رسوم الخدمة: 5 دينار أردني (تُضاف على سعر الحساب المتفق عليه). أدخل رقم واتساب الطرف الآخر والسعر لإنشاء روم الوساطة.</p>
       <label>أنا:</label>
       <select id="escrowMyRole">
         <option value="buyer">مشتري (سأشتري الحساب)</option>
@@ -983,6 +983,8 @@ function openEscrowModal(itemId, ownerWhatsapp, itemName) {
       <input type="tel" id="escrowOtherWhatsapp" placeholder="9627xxxxxxxx">
       <label>رقم واتساب الخاص بي:</label>
       <input type="tel" id="escrowMyWhatsapp" value="${escapeHtml(ownerWhatsapp || '')}">
+      <label>السعر المتفق عليه لقيمة الحساب (دينار):</label>
+      <input type="number" id="escrowDealAmount" placeholder="مثال: 20" min="1" step="0.5">
       <button onclick="createEscrowSession('${itemId}', '${escapeHtml(itemName || '')}')">إنشاء روم الوساطة</button>
       <button class="escrow-cancel" onclick="closeEscrowModal()">إلغاء</button>
       <div id="escrowResultBox"></div>
@@ -999,9 +1001,15 @@ async function createEscrowSession(itemId, itemName) {
   const myRole = document.getElementById('escrowMyRole').value;
   const otherWhatsapp = document.getElementById('escrowOtherWhatsapp').value.trim();
   const myWhatsapp = document.getElementById('escrowMyWhatsapp').value.trim();
+  const dealAmount = document.getElementById('escrowDealAmount').value.trim();
 
   if (!otherWhatsapp || !myWhatsapp) {
     alert('يرجى تعبئة رقمي الواتساب');
+    return;
+  }
+
+  if (!dealAmount || parseFloat(dealAmount) <= 0) {
+    alert('يرجى إدخال السعر المتفق عليه لقيمة الحساب');
     return;
   }
 
@@ -1012,7 +1020,7 @@ async function createEscrowSession(itemId, itemName) {
     const res = await fetch('/api/escrow/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sellerWhatsapp, buyerWhatsapp, itemId, gameType: itemName })
+      body: JSON.stringify({ sellerWhatsapp, buyerWhatsapp, itemId, gameType: itemName, dealAmount })
     });
     const data = await res.json();
     if (!data.success) { alert(data.error || 'تعذر إنشاء الجلسة'); return; }
