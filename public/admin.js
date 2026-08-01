@@ -1,24 +1,44 @@
-const ADMIN_PASSWORD = 'admin123';
-let isLoggedIn = false;
+let adminToken = localStorage.getItem('adminToken');
 
-if (localStorage.getItem('adminLoggedIn') === 'true') {
+if (adminToken) {
     showDashboard();
 }
 
-function login() {
+async function login() {
     const password = document.getElementById('passwordInput').value;
-    if (password === ADMIN_PASSWORD) {
-        localStorage.setItem('adminLoggedIn', 'true');
-        showDashboard();
-    } else {
-        alert('❌ كلمة المرور غير صحيحة');
+    try {
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+            adminToken = data.token;
+            localStorage.setItem('adminToken', adminToken);
+            showDashboard();
+        } else {
+            alert('❌ كلمة المرور غير صحيحة');
+        }
+    } catch (err) {
+        alert('❌ تعذر الاتصال بالسيرفر');
     }
 }
 
 function logout() {
-    localStorage.removeItem('adminLoggedIn');
+    adminToken = null;
+    localStorage.removeItem('adminToken');
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('dashboardScreen').classList.add('hidden');
+}
+
+function handleAuthError(status) {
+    if (status === 401) {
+        alert('⚠️ انتهت صلاحية جلستك، يرجى تسجيل الدخول من جديد');
+        logout();
+        return true;
+    }
+    return false;
 }
 
 function showDashboard() {
@@ -34,9 +54,7 @@ async function loadAds() {
         let ads = await response.json();
 
         const filterType = document.getElementById('filterType').value;
-        if (filterType) {
-            ads = ads.filter(ad => ad.adType === filterType);
-        }
+        if (filterType) ads = ads.filter(ad => ad.adType === filterType);
 
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         if (searchTerm) {
@@ -46,9 +64,7 @@ async function loadAds() {
             );
         }
 
-        document.getElementById('statsContainer').innerHTML = `
-            <div class="stat-card"><h3>${ads.length}</h3><p>إعلان</p></div>
-        `;
+        document.getElementById('statsContainer').innerHTML = `<div class="stat-card"><h3>${ads.length}</h3><p>إعلان</p></div>`;
 
         const container = document.getElementById('adsContainer');
         if (ads.length === 0) {
@@ -80,13 +96,13 @@ async function deleteAd(itemId) {
     try {
         const response = await fetch(`/api/admin/items/${itemId}`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ adminPassword: ADMIN_PASSWORD })
+            headers: { 'x-admin-token': adminToken }
         });
         if (response.ok) {
             alert('✅ تم حذف الإعلان بنجاح');
             loadAds();
         } else {
+            if (handleAuthError(response.status)) return;
             const err = await response.json();
             alert('❌ ' + (err.error || 'فشل في الحذف'));
         }
@@ -120,9 +136,10 @@ async function loadEscrowSessions() {
     const container = document.getElementById('escrowContainer');
     try {
         const response = await fetch('/api/admin/escrow/pending', {
-            headers: { 'x-admin-password': ADMIN_PASSWORD }
+            headers: { 'x-admin-token': adminToken }
         });
         if (!response.ok) {
+            if (handleAuthError(response.status)) return;
             const err = await response.json().catch(() => ({}));
             container.innerHTML = `<p class="empty-msg">❌ ${err.error || 'تعذر جلب طلبات الوسيط'}</p>`;
             return;
@@ -188,13 +205,14 @@ async function verifyPayment(sessionId) {
     try {
         const response = await fetch(`/api/admin/escrow/${sessionId}/verify-payment`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
             body: JSON.stringify({})
         });
         if (response.ok) {
             alert('✅ تم تأكيد الدفع، البائع صار يقدر يدخل بيانات الحساب');
             loadEscrowSessions();
         } else {
+            if (handleAuthError(response.status)) return;
             const err = await response.json().catch(() => ({}));
             alert('❌ ' + (err.error || 'فشل تأكيد الدفع'));
         }
@@ -208,13 +226,14 @@ async function markPaidSeller(sessionId) {
     try {
         const response = await fetch(`/api/admin/escrow/${sessionId}/mark-paid-seller`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
             body: JSON.stringify({})
         });
         if (response.ok) {
             alert('🎉 تم إغلاق الصفقة بنجاح');
             loadEscrowSessions();
         } else {
+            if (handleAuthError(response.status)) return;
             const err = await response.json().catch(() => ({}));
             alert('❌ ' + (err.error || 'فشل تأكيد التحويل'));
         }
@@ -228,13 +247,14 @@ async function forceComplete(sessionId) {
     try {
         const response = await fetch(`/api/admin/escrow/${sessionId}/force-complete`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
             body: JSON.stringify({})
         });
         if (response.ok) {
             alert('✅ تم فرض إتمام الصفقة، صارت جاهزة لتحويل المبلغ للبائع');
             loadEscrowSessions();
         } else {
+            if (handleAuthError(response.status)) return;
             const err = await response.json().catch(() => ({}));
             alert('❌ ' + (err.error || 'فشل فرض الإتمام'));
         }
@@ -251,13 +271,14 @@ async function resolveDispute(sessionId, resolution) {
     try {
         const response = await fetch(`/api/admin/escrow/${sessionId}/resolve-dispute`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-password': ADMIN_PASSWORD },
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
             body: JSON.stringify({ resolution })
         });
         if (response.ok) {
             alert('✅ تم تنفيذ القرار');
             loadEscrowSessions();
         } else {
+            if (handleAuthError(response.status)) return;
             const err = await response.json().catch(() => ({}));
             alert('❌ ' + (err.error || 'فشل تنفيذ القرار'));
         }

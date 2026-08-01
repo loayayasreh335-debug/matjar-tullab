@@ -8,7 +8,7 @@
 const cryptoNode = require('crypto');
 
 module.exports = function registerEscrowRoutes(app, ctx) {
-  const { db, crypto, ADMIN_PASSWORD } = ctx;
+  const { db, crypto, requireAdminToken } = ctx;
 
   db.collection('escrowSessions').createIndex({ id: 1 }, { unique: true }).catch(() => {});
   db.collection('escrowSessions').createIndex({ status: 1 }).catch(() => {});
@@ -30,16 +30,6 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     decipher.setAuthTag(tag);
     const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
     return JSON.parse(dec.toString('utf8'));
-  }
-
-  function requireAdmin(req, res, next) {
-    const headerPass = req.headers['x-admin-password'];
-    const bodyPass = req.body && req.body.adminPassword;
-    const password = headerPass || bodyPass;
-    if (!password || password !== ADMIN_PASSWORD) {
-      return res.status(401).json({ error: 'غير مصرح - كلمة سر الأدمن غير صحيحة' });
-    }
-    next();
   }
 
   function toPublicSession(s) {
@@ -187,7 +177,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
   });
 
   // ---------- (أدمن) تأكيد استلام الدفع ----------
-  app.post('/api/admin/escrow/:id/verify-payment', requireAdmin, async (req, res) => {
+  app.post('/api/admin/escrow/:id/verify-payment', requireAdminToken, async (req, res) => {
     try {
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
@@ -263,7 +253,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
   });
 
   // ---------- (أدمن) تأكيد تحويل سعر الحساب للبائع - إغلاق الصفقة بنجاح ----------
-  app.post('/api/admin/escrow/:id/mark-paid-seller', requireAdmin, async (req, res) => {
+  app.post('/api/admin/escrow/:id/mark-paid-seller', requireAdminToken, async (req, res) => {
     try {
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
@@ -279,7 +269,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
 
   // ---------- (أدمن) فرض إتمام الصفقة - يُستخدم لما المشتري يختفي بدون رد ----------
   // يجب أن يكون الأدمن حاول التواصل مع المشتري قبل استخدام هذا الزر
-  app.post('/api/admin/escrow/:id/force-complete', requireAdmin, async (req, res) => {
+  app.post('/api/admin/escrow/:id/force-complete', requireAdminToken, async (req, res) => {
     try {
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
@@ -299,7 +289,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
   });
 
   // ---------- (أدمن) حل النزاع: إتمام الصفقة أو استرجاع المبلغ للمشتري ----------
-  app.post('/api/admin/escrow/:id/resolve-dispute', requireAdmin, async (req, res) => {
+  app.post('/api/admin/escrow/:id/resolve-dispute', requireAdminToken, async (req, res) => {
     try {
       const { resolution } = req.body; // 'proceed' | 'refund'
       const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
@@ -322,7 +312,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
   });
 
   // ---------- (أدمن) كل الجلسات المعلقة (تحتاج إجراء) ----------
-  app.get('/api/admin/escrow/pending', requireAdmin, async (req, res) => {
+  app.get('/api/admin/escrow/pending', requireAdminToken, async (req, res) => {
     try {
       const sessions = await db.collection('escrowSessions')
         .find({ status: { $in: ['PENDING_PAYMENT', 'PAYMENT_VERIFIED', 'DATA_SUBMITTED', 'PAYOUT_PENDING', 'DISPUTED'] } })

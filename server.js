@@ -15,7 +15,37 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LOAYLOAYLOAYLOAY123456789987654321';
+
+// ---------- نظام تذاكر دخول الأدمن (Admin Session Tokens) ----------
+// كلمة سر الأدمن لا تُرسل ولا تُخزّن على المتصفح أبداً - فقط تذكرة مؤقتة (token)
+const adminTokens = new Map(); // token -> وقت انتهاء الصلاحية
+const ADMIN_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // صلاحية 7 أيام
+
+function issueAdminToken() {
+  const token = crypto.randomBytes(24).toString('hex');
+  adminTokens.set(token, Date.now() + ADMIN_TOKEN_TTL_MS);
+  return token;
+}
+
+function isValidAdminToken(token) {
+  if (!token) return false;
+  const expiry = adminTokens.get(token);
+  if (!expiry) return false;
+  if (expiry < Date.now()) {
+    adminTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function requireAdminToken(req, res, next) {
+  const token = req.headers['x-admin-token'];
+  if (!isValidAdminToken(token)) {
+    return res.status(401).json({ error: 'انتهت صلاحية الجلسة أو غير مسجل دخول. يرجى تسجيل الدخول من جديد.' });
+  }
+  next();
+}
 
 // مدة صلاحية الإعلان قبل حذفه تلقائياً (بالمللي ثانية) = 30 يوماً
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
@@ -384,6 +414,21 @@ app.delete('/api/items/:id', async (req, res) => {
   }
 });
 
+// حذف إعلان من لوحة تحكم الأدمن - يتطلب تذكرة دخول أدمن صالحة
+app.delete('/api/admin/items/:id', requireAdminToken, async (req, res) => {
+  try {
+    const item = await db.collection('items').findOne({ id: req.params.id });
+    if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
+
+    await deleteImagesFromCloudinary(item.imagePublicIds);
+    await db.collection('items').deleteOne({ id: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'تعذر حذف الإعلان' });
+  }
+});
+
 function escapeAttr(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -428,8 +473,8 @@ app.get('/university/:name', (req, res) => {
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
-    require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD });
-    require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary });
+    require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
+    require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
 
     // معالجة أخطاء Multer
     app.use((err, req, res, next) => {
