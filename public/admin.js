@@ -45,7 +45,99 @@ function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('dashboardScreen').classList.remove('hidden');
     loadAds();
+    loadAuctions();
     loadEscrowSessions();
+}
+
+// ---------- إدارة المزادات ----------
+const AUCTION_STATUS_LABELS = {
+    pending: '⏳ قيد المراجعة',
+    active: '✅ منشور',
+    rejected: '⛔ مرفوض',
+    ended: '🏁 منتهي'
+};
+
+async function loadAuctions() {
+    const container = document.getElementById('auctionsContainer');
+    try {
+        const response = await fetch('/api/admin/auctions?status=pending', {
+            headers: { 'x-admin-token': adminToken }
+        });
+        if (!response.ok) {
+            if (handleAuthError(response.status)) return;
+            const err = await response.json().catch(() => ({}));
+            container.innerHTML = `<p class="empty-msg">❌ ${err.error || 'تعذر جلب المزادات'}</p>`;
+            return;
+        }
+        const auctions = await response.json();
+
+        if (auctions.length === 0) {
+            container.innerHTML = '<p class="empty-msg">لا توجد مزادات قيد المراجعة حالياً</p>';
+            return;
+        }
+
+        container.innerHTML = auctions.map(a => {
+            const statusLabel = AUCTION_STATUS_LABELS[a.status] || a.status;
+            const endsAtStr = new Date(a.endsAt).toLocaleString('ar-EG');
+            const imgHtml = a.imageUrl
+                ? `<img class="proof-img" src="${a.imageUrl}" alt="${a.title}">`
+                : '<p>لا توجد صورة مرفوعة</p>';
+
+            return `
+                <div class="escrow-card">
+                    <span class="status-badge status-PENDING_PAYMENT">${statusLabel}</span>
+                    <p>📌 العنوان: ${a.title}</p>
+                    <p>📝 الوصف: ${a.description}</p>
+                    <p>💰 سعر البداية: ${a.startingPrice} دينار</p>
+                    <p>⏰ ينتهي: ${endsAtStr}</p>
+                    <p>📱 واتساب: ${a.whatsapp}</p>
+                    ${imgHtml}
+                    <div class="actions">
+                        <button class="btn btn-success" onclick="approveAuction('${a.id}')">✅ تفعيل ونشر</button>
+                        <button class="btn btn-warning" onclick="rejectAuction('${a.id}')">⛔ رفض</button>
+                        <button class="btn btn-danger" onclick="deleteAuction('${a.id}')">🗑️ حذف</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = '<p class="empty-msg">❌ خطأ في الاتصال بالسيرفر</p>';
+    }
+}
+
+async function approveAuction(id) {
+    if (!confirm('تأكيد استلام الرسوم وتفعيل المزاد للنشر العام؟')) return;
+    await auctionAction(`/api/admin/auctions/${id}/approve`, 'PATCH', '✅ تم تفعيل المزاد ونشره');
+}
+
+async function rejectAuction(id) {
+    if (!confirm('تأكيد رفض هذا المزاد؟')) return;
+    await auctionAction(`/api/admin/auctions/${id}/reject`, 'PATCH', '⛔ تم رفض المزاد');
+}
+
+async function deleteAuction(id) {
+    if (!confirm('تأكيد الحذف النهائي؟ هذا الإجراء لا يمكن التراجع عنه.')) return;
+    await auctionAction(`/api/admin/auctions/${id}`, 'DELETE', '🗑️ تم حذف المزاد');
+}
+
+async function auctionAction(url, method, successMsg) {
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'x-admin-token': adminToken }
+        });
+        if (response.ok) {
+            alert(successMsg);
+            loadAuctions();
+        } else {
+            if (handleAuthError(response.status)) return;
+            const err = await response.json().catch(() => ({}));
+            alert('❌ ' + (err.error || 'فشل تنفيذ الإجراء'));
+        }
+    } catch (err) {
+        alert('❌ خطأ في الاتصال');
+    }
 }
 
 async function loadAds() {

@@ -641,6 +641,9 @@ async function loadItems() {
 // ---------- إظهار/إخفاء حقل السعر أو "المطلوب" حسب نوع الإعلان (بيع/مقايضة) ----------
 const priceField = document.getElementById('priceField');
 const lookingForField = document.getElementById('lookingForField');
+const auctionStartingPriceField = document.getElementById('auctionStartingPriceField');
+const auctionEndsAtField = document.getElementById('auctionEndsAtField');
+const auctionNotice = document.getElementById('auctionNotice');
 
 function updateAdTypeFieldsVisibility() {
   const checked = itemForm.querySelector('input[name="adType"]:checked');
@@ -648,6 +651,7 @@ function updateAdTypeFieldsVisibility() {
 
   const isSell = selected === 'sell';
   const isBarter = selected === 'barter';
+  const isAuction = selected === 'auction';
 
   priceField.style.display = isSell ? 'flex' : 'none';
   itemForm.price.required = isSell;
@@ -656,6 +660,16 @@ function updateAdTypeFieldsVisibility() {
   lookingForField.style.display = isBarter ? 'flex' : 'none';
   itemForm.lookingFor.required = isBarter;
   if (!isBarter) itemForm.lookingFor.value = '';
+
+  auctionStartingPriceField.style.display = isAuction ? 'flex' : 'none';
+  itemForm.startingPrice.required = isAuction;
+  if (!isAuction) itemForm.startingPrice.value = '';
+
+  auctionEndsAtField.style.display = isAuction ? 'flex' : 'none';
+  itemForm.endsAt.required = isAuction;
+  if (!isAuction) itemForm.endsAt.value = '';
+
+  auctionNotice.style.display = isAuction ? 'block' : 'none';
 }
 
 itemForm.querySelectorAll('input[name="adType"]').forEach(radio => {
@@ -676,7 +690,7 @@ itemForm.addEventListener('submit', async (e) => {
   const selectedAdType = adTypeChecked ? adTypeChecked.value : '';
 
   if (!selectedAdType) {
-    formError.textContent = 'يرجى اختيار نوع الإعلان: بيع أو مقايضة';
+    formError.textContent = 'يرجى اختيار نوع الإعلان: بيع أو مقايضة أو مزاد';
     return;
   }
   if (selectedAdType === 'sell' && (!itemForm.price.value || Number(itemForm.price.value) <= 0)) {
@@ -687,12 +701,51 @@ itemForm.addEventListener('submit', async (e) => {
     formError.textContent = 'يرجى تحديد ما ترغب بالمقايضة به';
     return;
   }
+  if (selectedAdType === 'auction') {
+    if (!itemForm.startingPrice.value || Number(itemForm.startingPrice.value) <= 0) {
+      formError.textContent = 'يرجى إدخال سعر بداية صحيح للمزاد';
+      return;
+    }
+    if (!itemForm.endsAt.value || new Date(itemForm.endsAt.value).getTime() <= Date.now()) {
+      formError.textContent = 'يرجى اختيار وقت انتهاء صحيح بالمستقبل للمزاد';
+      return;
+    }
+  }
 
   const submitBtn = itemForm.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   submitBtn.textContent = 'جاري ضغط الصور ونشر الإعلان...';
 
   try {
+    // ضغط كل صورة قبل رفعها لتوفير مساحة التخزين
+    const compressedFiles = await Promise.all(
+      Array.from(imagesInput.files).map(file => compressImage(file))
+    );
+
+    if (selectedAdType === 'auction') {
+      // المزادات لها مسار ونظام مختلف (تخضع لمراجعة الإدارة قبل النشر)
+      const auctionData = new FormData();
+      auctionData.append('title', itemForm.name.value);
+      auctionData.append('description', itemForm.description.value);
+      auctionData.append('startingPrice', itemForm.startingPrice.value);
+      auctionData.append('endsAt', itemForm.endsAt.value);
+      auctionData.append('whatsapp', itemForm.whatsapp.value);
+      if (compressedFiles[0]) auctionData.append('image', compressedFiles[0]);
+
+      const res = await fetch('/api/auctions', { method: 'POST', body: auctionData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'حدث خطأ غير متوقع');
+
+      itemForm.reset();
+      updateUniversityFieldVisibility();
+      updateAdTypeFieldsVisibility();
+      areaSelect.innerHTML = '<option value="" disabled selected>اختر المحافظة أولاً</option>';
+      areaSelect.disabled = true;
+      overlay.classList.remove('active');
+      alert('✅ تم إرسال المزاد للمراجعة! رح يظهر للعامة بعد موافقة الإدارة.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('name', itemForm.name.value);
     formData.append('description', itemForm.description.value);
@@ -705,11 +758,6 @@ itemForm.addEventListener('submit', async (e) => {
     formData.append('category', itemForm.category.value);
     formData.append('governorate', itemForm.governorate.value || '');
     formData.append('area', itemForm.area.value || '');
-
-    // ضغط كل صورة قبل رفعها لتوفير مساحة التخزين
-    const compressedFiles = await Promise.all(
-      Array.from(imagesInput.files).map(file => compressImage(file))
-    );
     compressedFiles.forEach(file => formData.append('images', file));
 
     const res = await fetch('/api/items', {
