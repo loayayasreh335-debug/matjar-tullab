@@ -3,6 +3,7 @@
 // التدفق: دفع (سعر الحساب + 5 رسوم) للأدمن -> تحقق الأدمن -> البائع يدخل البيانات
 // -> تنكشف فوراً للمشتري -> المشتري يجرب ويأكد أو يبلغ عن مشكلة
 // -> لو أكد: الأدمن يحول سعر الحساب للبائع | لو أبلغ: الأدمن يراجع ويقرر
+// -> لو المشتري اختفى بدون رد: الأدمن يقدر "يفرض" إتمام الصفقة يدوياً
 
 const cryptoNode = require('crypto');
 
@@ -65,6 +66,14 @@ module.exports = function registerEscrowRoutes(app, ctx) {
     );
   }
 
+  // تحديث الحالة مع تسجيل وقت التغيير (يستخدم لعرض "من إمتى صايرة هيك" بلوحة الأدمن)
+  function setStatus(sessionId, status, extraSet = {}) {
+    return db.collection('escrowSessions').updateOne(
+      { id: sessionId },
+      { $set: { status, statusChangedAt: Date.now(), ...extraSet } }
+    );
+  }
+
   // ---------- إنشاء جلسة وساطة جديدة ----------
   app.post('/api/escrow/create', async (req, res) => {
     try {
@@ -79,6 +88,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
 
       const feeAmount = 5;
       const totalDue = Math.round((parsedDeal + feeAmount) * 100) / 100;
+      const now = Date.now();
 
       const session = {
         id: genId(),
@@ -87,6 +97,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
         gameType: gameType || '',
         itemId: itemId || null,
         status: 'PENDING_PAYMENT',
+        statusChangedAt: now,
         dealAmount: parsedDeal,
         feeAmount,
         totalDue,
@@ -96,13 +107,14 @@ module.exports = function registerEscrowRoutes(app, ctx) {
         credentials: null,
         disputeReason: null,
         sellerPaid: false,
+        forcedByAdmin: false,
         confirmations: { sellerConfirmed: false, buyerConfirmed: false },
         messages: [{
           senderRole: 'bot',
           text: `مرحباً بكما في روم الوسيط الآمن. المبلغ الإجمالي المطلوب تحويله للأدمن: ${totalDue} دينار (${parsedDeal} دينار سعر الحساب + ${feeAmount} دينار رسوم الخدمة). يرجى التحويل عبر CliQ أو Orange Money وإرفاق صورة الإشعار.`,
-          createdAt: Date.now()
+          createdAt: now
         }],
-        createdAt: Date.now()
+        createdAt: now
       };
 
       await db.collection('escrowSessions').insertOne(session);
@@ -182,10 +194,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (session.status !== 'PENDING_PAYMENT') {
         return res.status(400).json({ error: 'الجلسة ليست بانتظار تحقق الدفع' });
       }
-      await db.collection('escrowSessions').updateOne(
-        { id: req.params.id },
-        { $set: { status: 'PAYMENT_VERIFIED' } }
-      );
+      await setStatus(req.params.id, 'PAYMENT_VERIFIED');
       await pushMessage(req.params.id, 'تم تأكيد الدفع ✅. البائع، الرجاء إدخال بيانات الحساب الآن.');
       res.json({ success: true });
     } catch (err) {
@@ -205,15 +214,9 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (!email || !password) return res.status(400).json({ error: 'يرجى تعبئة الإيميل وكلمة السر' });
 
       const encryptedPayload = encryptCreds({ email, password, otpNote: otpNote || '' });
-      await db.collection('escrowSessions').updateOne(
-        { id: req.params.id },
-        {
-          $set: {
-            status: 'DATA_SUBMITTED',
-            credentials: { encryptedPayload, submittedAt: Date.now(), revealedToBuyer: true, revealedAt: Date.now() }
-          }
-        }
-      );
+      await setStatus(req.params.id, 'DATA_SUBMITTED', {
+        credentials: { encryptedPayload, submittedAt: Date.now(), revealedToBuyer: true, revealedAt: Date.now() }
+      });
       await pushMessage(req.params.id, 'تم استلام بيانات الحساب. المشتري، جرّب الدخول الآن على الحساب، وبعد التأكد اضغط "تم الاستلام والرضا" أو "الإبلاغ عن مشكلة" إذا في خطأ بالبيانات.');
       res.json({ success: true });
     } catch (err) {
@@ -231,10 +234,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (token !== session.buyerToken) return res.status(403).json({ error: 'المشتري فقط يمكنه تأكيد الاستلام' });
       if (session.status !== 'DATA_SUBMITTED') return res.status(400).json({ error: 'لا يمكن التأكيد بهذه المرحلة' });
 
-      await db.collection('escrowSessions').updateOne(
-        { id: req.params.id },
-        { $set: { status: 'PAYOUT_PENDING', 'confirmations.buyerConfirmed': true } }
-      );
+      await setStatus(req.params.id, 'PAYOUT_PENDING', { 'confirmations.buyerConfirmed': true });
       await pushMessage(req.params.id, 'المشتري أكد استلام الحساب بنجاح ✅. الأدمن بيحول سعر الحساب للبائع الآن.');
       res.json({ success: true });
     } catch (err) {
@@ -253,10 +253,7 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (session.status !== 'DATA_SUBMITTED') return res.status(400).json({ error: 'لا يمكن الإبلاغ بهذه المرحلة' });
       if (!reason || !reason.trim()) return res.status(400).json({ error: 'يرجى كتابة سبب المشكلة' });
 
-      await db.collection('escrowSessions').updateOne(
-        { id: req.params.id },
-        { $set: { status: 'DISPUTED', disputeReason: reason.trim().slice(0, 500) } }
-      );
+      await setStatus(req.params.id, 'DISPUTED', { disputeReason: reason.trim().slice(0, 500) });
       await pushMessage(req.params.id, '⚠️ المشتري أبلغ عن مشكلة بالحساب. الجلسة الآن قيد المراجعة من فريق الإدارة، ولن يتم تحويل أي مبلغ للبائع لحد ما تتحل المشكلة.');
       res.json({ success: true });
     } catch (err) {
@@ -272,14 +269,32 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
       if (session.status !== 'PAYOUT_PENDING') return res.status(400).json({ error: 'الجلسة ليست بانتظار تحويل للبائع' });
 
-      await db.collection('escrowSessions').updateOne(
-        { id: req.params.id },
-        { $set: { status: 'COMPLETED', sellerPaid: true } }
-      );
+      await setStatus(req.params.id, 'COMPLETED', { sellerPaid: true });
       await pushMessage(req.params.id, '🎉 تم تحويل المبلغ للبائع، واكتملت الصفقة بنجاح. شكراً لاستخدامكم خدمة الوسيط الآمن.');
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: 'تعذر تأكيد التحويل' });
+    }
+  });
+
+  // ---------- (أدمن) فرض إتمام الصفقة - يُستخدم لما المشتري يختفي بدون رد ----------
+  // يجب أن يكون الأدمن حاول التواصل مع المشتري قبل استخدام هذا الزر
+  app.post('/api/admin/escrow/:id/force-complete', requireAdmin, async (req, res) => {
+    try {
+      const session = await db.collection('escrowSessions').findOne({ id: req.params.id });
+      if (!session) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+      if (session.status !== 'DATA_SUBMITTED') {
+        return res.status(400).json({ error: 'هذا الإجراء متاح فقط عندما تكون البيانات مُرسلة والمشتري لم يرد' });
+      }
+
+      await setStatus(req.params.id, 'PAYOUT_PENDING', {
+        'confirmations.buyerConfirmed': true,
+        forcedByAdmin: true
+      });
+      await pushMessage(req.params.id, '⏰ لم يرد المشتري خلال مدة كافية، فقامت الإدارة بفرض إتمام الصفقة يدوياً بعد محاولة التواصل. جاري تحويل المبلغ للبائع.');
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'تعذر فرض الإتمام' });
     }
   });
 
@@ -292,16 +307,10 @@ module.exports = function registerEscrowRoutes(app, ctx) {
       if (session.status !== 'DISPUTED') return res.status(400).json({ error: 'الجلسة ليست بحالة نزاع' });
 
       if (resolution === 'proceed') {
-        await db.collection('escrowSessions').updateOne(
-          { id: req.params.id },
-          { $set: { status: 'PAYOUT_PENDING' } }
-        );
+        await setStatus(req.params.id, 'PAYOUT_PENDING');
         await pushMessage(req.params.id, 'تمت مراجعة البلاغ من الإدارة، وتقرر إتمام الصفقة. جاري تحويل المبلغ للبائع.');
       } else if (resolution === 'refund') {
-        await db.collection('escrowSessions').updateOne(
-          { id: req.params.id },
-          { $set: { status: 'REFUNDED' } }
-        );
+        await setStatus(req.params.id, 'REFUNDED');
         await pushMessage(req.params.id, 'تمت مراجعة البلاغ من الإدارة، وتقرر استرجاع كامل المبلغ للمشتري. تم إلغاء الصفقة.');
       } else {
         return res.status(400).json({ error: 'قيمة resolution غير صحيحة' });
