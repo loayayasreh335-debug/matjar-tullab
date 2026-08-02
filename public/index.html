@@ -29,6 +29,8 @@
         <button id="themeToggleBtn" class="btn-icon" title="تبديل المظهر">🌙</button>
         <button id="myAdsBtn" class="btn btn-ghost">📋 إعلاناتي</button>
         <a href="/lostfound.html" class="btn btn-ghost">🔍 المفقودات</a>
+        <div id="authWidget"></div>
+        <a href="/lostfound.html" class="btn btn-ghost">🔍 المفقودات</a>
         <button id="openSupportBtn" class="btn btn-support">💛 ادعم المطور</button>
         <button id="openFormBtn" class="btn btn-primary">+ أضف غرضك</button>
       </div>
@@ -248,6 +250,12 @@
     </div>
   </div>
 
+  <link rel="stylesheet" href="chat.css">
+  <div id="chatRoot"></div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="auth.js"></script>
+  <script src="chat.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

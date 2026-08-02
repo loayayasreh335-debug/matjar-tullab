@@ -484,9 +484,11 @@ app.get('/university/:name', (req, res) => {
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
+    require('./routes-auth')(app, { db, crypto });
+    require('./routes-chat')(app, { db });
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
     require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
-    require('./routes-lostfound')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, requireAdminToken, JORDAN_LOCATIONS });
+    require('./routes-lostfound')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, requireAdminToken, JORDAN_LOCATIONS, requireUserAuth: app.locals.requireUserAuth });
 
     // معالجة أخطاء Multer
     app.use((err, req, res, next) => {
