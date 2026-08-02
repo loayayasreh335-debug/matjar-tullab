@@ -1,34 +1,27 @@
 process.on("uncaughtException", (err) => { console.log("Catch err:", err.message); });
-)
-    });
-    console.log('✅ Firebase initialized successfully');
-  } catch (e) {
-    console.log('⚠️ Firebase init skipped:', e.message);
-  }
-} else {
-  console.log('⚠️ FIREBASE_PRIVATE_KEY missing, skipping Firebase init');
-}
 
+const admin = require('firebase-admin');
 
-,
-    });
+let privateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY;
+
+if (privateKey) {
+  try {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID || "sooqna-72753",
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@sooqna-72753.iam.gserviceaccount.com",
+          privateKey: privateKey
+        })
+      });
+    }
     console.log('✅ Firebase initialized successfully');
   } catch (e) {
     console.log('⚠️ Firebase init skipped/error:', e.message);
   }
 } else {
   console.log('⚠️ FIREBASE_PRIVATE_KEY missing, skipping Firebase init');
-}
-
-
-,
-    });
-    console.log('Firebase initialized successfully');
-  } catch (e) {
-    console.log('Firebase init error:', e.message);
-  }
-} else {
-  console.log('FIREBASE_PRIVATE_KEY is missing');
 }
 
 // server.js
@@ -205,7 +198,6 @@ async function deleteImagesFromCloudinary(publicIds) {
 }
 
 // ---------- دوال مساعدة ----------
-
 function normalizeItem(item) {
   if (!item.imageUrls) item.imageUrls = [];
   if (!item.imagePublicIds) item.imagePublicIds = [];
