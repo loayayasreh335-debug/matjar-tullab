@@ -1,0 +1,29 @@
+/* lostfound.css - إضافات بسيطة خاصة بصفحة المفقودات فقط
+   كل الألوان والمتغيرات (--primary, --navy, --card-bg...) مأخوذة من style.css الأصلي
+   هذا الملف لا يعرّف أي متغير جديد، فقط يستخدم الموجود للحفاظ على نفس الهوية البصرية */
+
+.lf-fab {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 30;
+  box-shadow: var(--shadow-hover);
+  border-radius: 30px;
+  padding: 14px 22px;
+}
+
+.lf-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: -4px 0 0;
+}
+
+@media (max-width: 480px) {
+  .lf-fab {
+    left: 14px;
+    bottom: 14px;
+    padding: 12px 18px;
+    font-size: 13px;
+  }
+}

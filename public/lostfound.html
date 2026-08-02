@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>المفقودات والموجودات | سوقنا</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lostfound.css">
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"></span>
+        <span>سوقنا</span>
+      </a>
+      <div class="navbar-actions">
+        <button id="themeToggleBtn" class="btn-icon" title="تبديل المظهر">🌙</button>
+        <a href="/" class="btn btn-ghost">🏠 الرئيسية</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>المفقودات والموجودات بالمملكة</h1>
+    <p>ضاع منك إشي؟ أو لقيت غرض حدا فاقده؟ ساعد نفسك وساعد غيرك تلاقوا أغراضكم</p>
+    <div id="resolvedCounter" class="stats-counter" style="display:none;"></div>
+  </section>
+
+  <main class="container">
+    <div class="filters-bar">
+      <div class="filters-row">
+        <select id="filterType">
+          <option value="">📋 الكل (ضاع/وُجد)</option>
+          <option value="lost">🔍 ضاع مني</option>
+          <option value="found">🙋‍♂️ وجدت إشي</option>
+        </select>
+        <select id="filterGovernorate">
+          <option value="">📍 كل المحافظات</option>
+        </select>
+        <select id="filterCategory">
+          <option value="">🏷️ كل التصنيفات</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="itemsCount" class="items-count"></div>
+    <div id="itemsGrid" class="grid"></div>
+    <div id="emptyState" class="empty-state" style="display:none;">
+      لا يوجد منشورات مطابقة حالياً — كن أول من ينشر 🙌
+    </div>
+  </main>
+
+  <button id="openFormBtn" class="btn btn-primary lf-fab">+ أضف منشور</button>
+
+  <!-- نافذة نموذج إضافة منشور -->
+  <div id="formOverlay" class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>إضافة منشور جديد</h2>
+        <button id="closeFormBtn" class="btn-close">✕</button>
+      </div>
+
+      <form id="lfForm" class="item-form">
+        <label>
+          الحالة
+          <div class="ad-type-toggle" id="typeToggle">
+            <label class="ad-type-option">
+              <input type="radio" name="type" value="lost" required>
+              <span>🔍 ضاع مني</span>
+            </label>
+            <label class="ad-type-option">
+              <input type="radio" name="type" value="found" required>
+              <span>🙋‍♂️ وجدت إشي</span>
+            </label>
+          </div>
+        </label>
+
+        <label>
+          التصنيف
+          <select name="category" id="categorySelect" required>
+            <option value="" disabled selected>اختر التصنيف</option>
+          </select>
+        </label>
+
+        <label>
+          المحافظة
+          <select name="governorate" id="governorateSelect" required>
+            <option value="" disabled selected>اختر المحافظة</option>
+          </select>
+        </label>
+
+        <label>
+          المنطقة
+          <select name="area" id="areaSelect" required disabled>
+            <option value="" disabled selected>اختر المحافظة أولاً</option>
+          </select>
+        </label>
+
+        <label>
+          اسم الغرض
+          <input type="text" name="name" placeholder="مثال: محفظة جلدية بنية" required>
+        </label>
+
+        <label>
+          الوصف
+          <textarea name="description" rows="3" placeholder="اكتب وصفاً واضحاً: أين ضاع/وُجد ومتى" required></textarea>
+        </label>
+
+        <div id="verificationField" style="display:none;">
+          <label>
+            علامة فارقة (تُستخدم للتحقق من صاحب الغرض الحقيقي)
+            <input type="text" name="verificationAnswer" placeholder="مثال: فيها كرت جامعي باسم...">
+          </label>
+          <p class="lf-hint">⚠️ هاي المعلومة سرية ولا تظهر للعامة — رح تُستخدم لسؤال أي حدا يدّعي إنه صاحب الغرض قبل ما نعطيه رقم تواصلك.</p>
+        </div>
+
+        <label>
+          رقم الواتساب (مع رمز الدولة)
+          <input type="tel" name="whatsapp" placeholder="مثال: 9627xxxxxxxx" required>
+        </label>
+
+        <label>
+          صور (اختياري - حتى 4 صور)
+          <input type="file" name="images" accept="image/*" multiple>
+        </label>
+
+        <div id="formError" class="form-error"></div>
+
+        <button type="submit" class="btn btn-primary btn-block">نشر</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- نافذة سؤال التحقق -->
+  <div id="claimOverlay" class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>تأكيد الملكية 🔒</h2>
+        <button id="closeClaimBtn" class="btn-close">✕</button>
+      </div>
+      <p class="support-text">لإثبات إنك صاحب الغرض الحقيقي، جاوب على سؤال التحقق اللي حدده الناشر:</p>
+      <form id="claimForm">
+        <input type="text" id="claimAnswerInput" placeholder="إجابتك هنا" required style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--input-bg);color:var(--text-dark);">
+        <div id="claimError" class="form-error"></div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px;">تأكيد</button>
+      </form>
+      <div id="claimSuccess" style="display:none;text-align:center;margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <script src="lostfound.js"></script>
+</body>
+</html>
