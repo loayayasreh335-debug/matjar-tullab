@@ -1,7 +1,9 @@
 // routes-auth.js
 // نظام تسجيل الدخول بجوجل عبر Firebase - يتحقق من هوية المستخدم على السيرفر فعلياً
 // (مش بس بيصدق أي بيانات يبعتها المتصفح) عبر Firebase Admin SDK
-const admin = require('firebase-admin');
+// ملاحظة: firebase-admin v13+ يستخدم استيراد حديث (modular)، مش الطريقة القديمة admin.apps / admin.auth()
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 
 module.exports = function registerAuthRoutes(app, deps) {
   const { db, crypto } = deps;
@@ -14,19 +16,24 @@ module.exports = function registerAuthRoutes(app, deps) {
     process.env.FIREBASE_PRIVATE_KEY
   );
 
-  if (firebaseEnvReady && !admin.apps.length) {
+  let firebaseReady = false;
+
+  if (firebaseEnvReady && getApps().length === 0) {
     try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
+      initializeApp({
+        credential: cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
         })
       });
+      firebaseReady = true;
       console.log('✅ Firebase Admin تم تهيئته بنجاح');
     } catch (err) {
       console.error('⚠️ فشل تهيئة Firebase (تسجيل الدخول بجوجل سيكون معطّلاً مؤقتاً):', err.message);
     }
+  } else if (getApps().length > 0) {
+    firebaseReady = true;
   } else if (!firebaseEnvReady) {
     console.warn('⚠️ متغيرات Firebase غير مكتملة على Render (FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY) — تسجيل الدخول بجوجل معطّل مؤقتاً، والسيرفر بيكمل الشغل عادي.');
   }
@@ -67,13 +74,13 @@ module.exports = function registerAuthRoutes(app, deps) {
   // ---------- تسجيل الدخول ----------
   app.post('/api/auth/google', async (req, res) => {
     try {
-      if (!admin.apps.length) {
+      if (!firebaseReady) {
         return res.status(503).json({ error: 'تسجيل الدخول بجوجل غير مفعّل حالياً على السيرفر' });
       }
       const { idToken } = req.body;
       if (!idToken) return res.status(400).json({ error: 'رمز الدخول مفقود' });
 
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await getAuth().verifyIdToken(idToken);
       const { uid, email, name, picture } = decoded;
 
       await db.collection('users').updateOne(
