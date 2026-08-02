@@ -1,20 +1,34 @@
 // routes-auth.js
 // نظام تسجيل الدخول بجوجل عبر Firebase - يتحقق من هوية المستخدم على السيرفر فعلياً
 // (مش بس بيصدق أي بيانات يبعتها المتصفح) عبر Firebase Admin SDK
-
 const admin = require('firebase-admin');
 
 module.exports = function registerAuthRoutes(app, deps) {
   const { db, crypto } = deps;
 
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
-      })
-    });
+  // نتحقق إن كل متغيرات Firebase موجودة قبل أي محاولة تهيئة
+  // لو ناقصة، نتخطى التهيئة بأمان بدل ما نوقع السيرفر بالكامل
+  const firebaseEnvReady = !!(
+    process.env.FIREBASE_PROJECT_ID &&
+    process.env.FIREBASE_CLIENT_EMAIL &&
+    process.env.FIREBASE_PRIVATE_KEY
+  );
+
+  if (firebaseEnvReady && !admin.apps.length) {
+    try {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        })
+      });
+      console.log('✅ Firebase Admin تم تهيئته بنجاح');
+    } catch (err) {
+      console.error('⚠️ فشل تهيئة Firebase (تسجيل الدخول بجوجل سيكون معطّلاً مؤقتاً):', err.message);
+    }
+  } else if (!firebaseEnvReady) {
+    console.warn('⚠️ متغيرات Firebase غير مكتملة على Render (FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY) — تسجيل الدخول بجوجل معطّل مؤقتاً، والسيرفر بيكمل الشغل عادي.');
   }
 
   db.collection('users').createIndex({ uid: 1 }, { unique: true }).catch(console.error);
@@ -53,6 +67,9 @@ module.exports = function registerAuthRoutes(app, deps) {
   // ---------- تسجيل الدخول ----------
   app.post('/api/auth/google', async (req, res) => {
     try {
+      if (!admin.apps.length) {
+        return res.status(503).json({ error: 'تسجيل الدخول بجوجل غير مفعّل حالياً على السيرفر' });
+      }
       const { idToken } = req.body;
       if (!idToken) return res.status(400).json({ error: 'رمز الدخول مفقود' });
 
