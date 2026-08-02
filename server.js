@@ -1,20 +1,27 @@
-
 const admin = require('firebase-admin');
 
-// جلب المفتاح مع تنظيف الأسطر
 let privateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY;
 
 if (privateKey) {
   try {
-    // استبدال الأسطر الجديدة إذا كانت مكتوبة كـ نص \n
     privateKey = privateKey.replace(/\\n/g, '\n');
-    
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID || "sooqna-72753",
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@sooqna-72753.iam.gserviceaccount.com",
-        privateKey: privateKey,
-      }),
+        privateKey: privateKey
+      })
+    });
+    console.log('✅ Firebase initialized successfully');
+  } catch (e) {
+    console.log('⚠️ Firebase init skipped:', e.message);
+  }
+} else {
+  console.log('⚠️ FIREBASE_PRIVATE_KEY missing, skipping Firebase init');
+}
+
+
+,
     });
     console.log('✅ Firebase initialized successfully');
   } catch (e) {
