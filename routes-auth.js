@@ -99,7 +99,7 @@ module.exports = function registerAuthRoutes(app, deps) {
         user: { uid: user.uid, name: user.name, email: user.email, picture: user.picture }
       });
     } catch (err) {
-      console.error('فشل التحقق من تسجيل الدخول:', err.message);
+      console.error('فشل التحقق من تسجيل الدخول:', err.stack || err.message);
       res.status(401).json({ error: 'فشل تسجيل الدخول، حاول مرة أخرى' });
     }
   });
