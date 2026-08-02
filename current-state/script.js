@@ -58,7 +58,6 @@ const closeWelcomeBtn = document.getElementById('closeWelcomeBtn');
 
 // ---------- الحالة العامة ----------
 let itemsCache = [];
-let auctionsCache = [];
 let showOnlyMine = false;
 
 // ---------- الوضع الليلي / الفاتح ----------
@@ -102,7 +101,7 @@ async function loadDeveloperContact() {
     const res = await fetch('/api/developer-contact');
     const data = await res.json();
     if (data.whatsapp) {
-      developerWhatsappLink.href = `https://wa.me/${data.whatsapp}?text=${encodeURIComponent('مرحباً، عندي استفسار/اقتراح بخصوص سوقنا')}`;
+      developerWhatsappLink.href = `https://wa.me/${data.whatsapp}?text=${encodeURIComponent('مرحباً، عندي استفسار/اقتراح بخصوص متجر الطلاب')}`;
     }
   } catch (err) {
     console.error('فشل تحميل بيانات التواصل:', err);
@@ -385,7 +384,7 @@ function escapeHtml(str) {
 }
 
 function buildWhatsappLink(number, itemName) {
-  const message = encodeURIComponent(`مرحباً، أنا مهتم بمقايضة "${itemName}" الذي عرضته في سوقنا.`);
+  const message = encodeURIComponent(`مرحباً، أنا مهتم بمقايضة "${itemName}" الذي عرضته في متجر الطلاب.`);
   return `https://wa.me/${number}?text=${message}`;
 }
 
@@ -413,7 +412,7 @@ function buildItemUrl(itemId) {
 
 async function shareItem(item) {
   const url = buildItemUrl(item.id);
-  const text = `شاهد "${item.name}" على سوقنا - متاح للمقايضة`;
+  const text = `شاهد "${item.name}" على متجر الطلاب - متاح للمقايضة`;
 
   if (navigator.share) {
     try {
@@ -465,7 +464,7 @@ function renderCard(item) {
     : '';
 
   const universityBadge = item.university
-    ? `<span class="card-university"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"> ${escapeHtml(item.university)}</span>` : '';
+    ? `<span class="card-university">🎓 ${escapeHtml(item.university)}</span>` : '';
 
   const gameTypeBadge = item.gameType
     ? `<span class="card-university">🎮 ${escapeHtml(item.gameType)}</span>` : '';
@@ -529,65 +528,6 @@ card.querySelectorAll('a[href^="/item/"]').forEach(link => {
   });
 });  return card;
 }
-
-// ---------- عرض كروت المزادات (نظام منفصل عن البيع/المقايضة) ----------
-function auctionTimeLeftText(endsAt) {
-  const diff = endsAt - Date.now();
-  if (diff <= 0) return { text: 'انتهى المزاد', ended: true };
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  const mins = Math.floor((diff % 3600000) / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
-  let text = '';
-  if (days > 0) text = `⏰ متبقي ${days} يوم ${hours} ساعة`;
-  else if (hours > 0) text = `⏰ متبقي ${hours} ساعة ${mins} دقيقة`;
-  else text = `⏰ متبقي ${mins} دقيقة ${secs} ثانية`;
-  return { text, ended: false };
-}
-
-function renderAuctionCard(auction) {
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.style.cursor = 'pointer';
-
-  const imageHtml = auction.imageUrl
-    ? `<img class="card-image" src="${auction.imageUrl}" alt="${escapeHtml(auction.title)}" onerror="handleImageError(this)">`
-    : `<div class="card-image placeholder">🔨</div>`;
-
-  card.innerHTML = `
-    <div class="card-image-wrap">
-      ${imageHtml}
-    </div>
-    <div class="card-body">
-      <div class="card-badges-row">
-        <span class="card-category">🔨 مزاد</span>
-      </div>
-      <h3 class="card-title">${escapeHtml(auction.title)}</h3>
-      <p style="font-size:13px;color:var(--text-muted,#6b7280);margin:0 0 8px;">${escapeHtml(auction.description)}</p>
-      <div class="card-trade">💰 السعر الحالي: ${auction.currentBid} د.أ</div>
-      <div class="card-meta-row">
-        <span class="auction-timer" data-ends="${auction.endsAt}">${auctionTimeLeftText(auction.endsAt).text}</span>
-        <span>💵 عدد المزايدات: ${auction.bidsCount || 0}</span>
-      </div>
-      <button class="btn-whatsapp" style="width:100%;margin-top:8px;">🔨 ادخل وزايد</button>
-    </div>
-  `;
-
-  card.addEventListener('click', () => {
-    window.location.href = `/auction-detail.html?id=${auction.id}`;
-  });
-
-  return card;
-}
-
-function updateAuctionTimers() {
-  document.querySelectorAll('.auction-timer').forEach(el => {
-    const endsAt = parseInt(el.dataset.ends, 10);
-    const { text } = auctionTimeLeftText(endsAt);
-    el.textContent = text;
-  });
-}
-setInterval(updateAuctionTimers, 1000);
 
 // ---------- إجراءات الحذف وتبديل حالة المقايضة ----------
 async function deleteItem(itemId, ownerToken) {
@@ -664,17 +604,6 @@ function applyFiltersAndRender() {
     } else {
       emptyState.innerHTML = `<p>لا توجد أغراض معروضة حالياً.</p><p>كن أول من يضيف غرضاً للمقايضة! 👇</p>`;
     }
-
-    // حتى لو ما في أغراض عادية، اعرض المزادات النشطة إن وُجدت
-    if (!showOnlyMine && !query && !uniFilter && !catFilter && auctionsCache.length > 0) {
-      emptyState.style.display = 'none';
-      const auctionHeader = document.createElement('div');
-      auctionHeader.className = 'items-count';
-      auctionHeader.style.cssText = 'flex-basis:100%;font-weight:700;';
-      auctionHeader.textContent = `🔨 ${auctionsCache.length} مزاد نشط`;
-      itemsGrid.appendChild(auctionHeader);
-      auctionsCache.forEach(auction => itemsGrid.appendChild(renderAuctionCard(auction)));
-    }
     return;
   }
 
@@ -682,17 +611,6 @@ function applyFiltersAndRender() {
   itemsCount.textContent = `${filtered.length} غرض معروض للمقايضة`;
 
   filtered.forEach(item => itemsGrid.appendChild(renderCard(item)));
-
-  // عرض المزادات النشطة بعد الأغراض العادية (بدون تطبيق فلاتر البيع/المقايضة عليها)
-  if (auctionsCache.length > 0) {
-    const auctionHeader = document.createElement('div');
-    auctionHeader.className = 'items-count';
-    auctionHeader.style.cssText = 'flex-basis:100%;margin-top:20px;font-weight:700;';
-    auctionHeader.textContent = `🔨 ${auctionsCache.length} مزاد نشط`;
-    itemsGrid.appendChild(auctionHeader);
-
-    auctionsCache.forEach(auction => itemsGrid.appendChild(renderAuctionCard(auction)));
-  }
 }
 
 searchInput.addEventListener('input', applyFiltersAndRender);
@@ -707,16 +625,12 @@ myAdsBtn.addEventListener('click', () => {
   applyFiltersAndRender();
 });
 
-// ---------- جلب كل الأغراض والمزادات ----------
+// ---------- جلب كل الأغراض ----------
 async function loadItems() {
   renderSkeletons();
   try {
-    const [itemsRes, auctionsRes] = await Promise.all([
-      fetch('/api/items'),
-      fetch('/api/auctions').catch(() => null)
-    ]);
-    itemsCache = await itemsRes.json();
-    auctionsCache = auctionsRes && auctionsRes.ok ? await auctionsRes.json() : [];
+    const res = await fetch('/api/items');
+    itemsCache = await res.json();
     applyFiltersAndRender();
   } catch (err) {
     console.error('فشل تحميل الأغراض:', err);
@@ -727,9 +641,6 @@ async function loadItems() {
 // ---------- إظهار/إخفاء حقل السعر أو "المطلوب" حسب نوع الإعلان (بيع/مقايضة) ----------
 const priceField = document.getElementById('priceField');
 const lookingForField = document.getElementById('lookingForField');
-const auctionStartingPriceField = document.getElementById('auctionStartingPriceField');
-const auctionEndsAtField = document.getElementById('auctionEndsAtField');
-const auctionNotice = document.getElementById('auctionNotice');
 
 function updateAdTypeFieldsVisibility() {
   const checked = itemForm.querySelector('input[name="adType"]:checked');
@@ -737,7 +648,6 @@ function updateAdTypeFieldsVisibility() {
 
   const isSell = selected === 'sell';
   const isBarter = selected === 'barter';
-  const isAuction = selected === 'auction';
 
   priceField.style.display = isSell ? 'flex' : 'none';
   itemForm.price.required = isSell;
@@ -746,16 +656,6 @@ function updateAdTypeFieldsVisibility() {
   lookingForField.style.display = isBarter ? 'flex' : 'none';
   itemForm.lookingFor.required = isBarter;
   if (!isBarter) itemForm.lookingFor.value = '';
-
-  auctionStartingPriceField.style.display = isAuction ? 'flex' : 'none';
-  itemForm.startingPrice.required = isAuction;
-  if (!isAuction) itemForm.startingPrice.value = '';
-
-  auctionEndsAtField.style.display = isAuction ? 'flex' : 'none';
-  itemForm.endsAt.required = isAuction;
-  if (!isAuction) itemForm.endsAt.value = '';
-
-  auctionNotice.style.display = isAuction ? 'block' : 'none';
 }
 
 itemForm.querySelectorAll('input[name="adType"]').forEach(radio => {
@@ -776,7 +676,7 @@ itemForm.addEventListener('submit', async (e) => {
   const selectedAdType = adTypeChecked ? adTypeChecked.value : '';
 
   if (!selectedAdType) {
-    formError.textContent = 'يرجى اختيار نوع الإعلان: بيع أو مقايضة أو مزاد';
+    formError.textContent = 'يرجى اختيار نوع الإعلان: بيع أو مقايضة';
     return;
   }
   if (selectedAdType === 'sell' && (!itemForm.price.value || Number(itemForm.price.value) <= 0)) {
@@ -787,55 +687,12 @@ itemForm.addEventListener('submit', async (e) => {
     formError.textContent = 'يرجى تحديد ما ترغب بالمقايضة به';
     return;
   }
-  if (selectedAdType === 'auction') {
-    if (!itemForm.startingPrice.value || Number(itemForm.startingPrice.value) <= 0) {
-      formError.textContent = 'يرجى إدخال سعر بداية صحيح للمزاد';
-      return;
-    }
-    if (!itemForm.endsAt.value || new Date(itemForm.endsAt.value).getTime() <= Date.now()) {
-      formError.textContent = 'يرجى اختيار وقت انتهاء صحيح بالمستقبل للمزاد';
-      return;
-    }
-  }
 
   const submitBtn = itemForm.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   submitBtn.textContent = 'جاري ضغط الصور ونشر الإعلان...';
 
   try {
-    // ضغط كل صورة قبل رفعها لتوفير مساحة التخزين
-    const compressedFiles = await Promise.all(
-      Array.from(imagesInput.files).map(file => compressImage(file))
-    );
-
-    if (selectedAdType === 'auction') {
-      // المزادات لها مسار ونظام مختلف (تخضع لمراجعة الإدارة قبل النشر)
-      const auctionData = new FormData();
-      auctionData.append('title', itemForm.name.value);
-      auctionData.append('description', itemForm.description.value);
-      auctionData.append('startingPrice', itemForm.startingPrice.value);
-      auctionData.append('endsAt', itemForm.endsAt.value);
-      auctionData.append('whatsapp', itemForm.whatsapp.value);
-      if (compressedFiles[0]) auctionData.append('image', compressedFiles[0]);
-
-      const res = await fetch('/api/auctions', { method: 'POST', body: auctionData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'حدث خطأ غير متوقع');
-
-      if (data.ownerToken && data.id) {
-        localStorage.setItem(`auctionOwner:${data.id}`, data.ownerToken);
-      }
-
-      itemForm.reset();
-      updateUniversityFieldVisibility();
-      updateAdTypeFieldsVisibility();
-      areaSelect.innerHTML = '<option value="" disabled selected>اختر المحافظة أولاً</option>';
-      areaSelect.disabled = true;
-      overlay.classList.remove('active');
-      alert('✅ تم إرسال المزاد للمراجعة! رح يظهر للعامة بعد موافقة الإدارة.');
-      return;
-    }
-
     const formData = new FormData();
     formData.append('name', itemForm.name.value);
     formData.append('description', itemForm.description.value);
@@ -848,6 +705,11 @@ itemForm.addEventListener('submit', async (e) => {
     formData.append('category', itemForm.category.value);
     formData.append('governorate', itemForm.governorate.value || '');
     formData.append('area', itemForm.area.value || '');
+
+    // ضغط كل صورة قبل رفعها لتوفير مساحة التخزين
+    const compressedFiles = await Promise.all(
+      Array.from(imagesInput.files).map(file => compressImage(file))
+    );
     compressedFiles.forEach(file => formData.append('images', file));
 
     const res = await fetch('/api/items', {
@@ -922,7 +784,7 @@ function renderItemDetail(item) {
     : '';
 
   const universityBadgeDetail = item.university
-    ? `<span class="card-university"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"> ${escapeHtml(item.university)}</span>` : '';
+    ? `<span class="card-university">🎓 ${escapeHtml(item.university)}</span>` : '';
 
   const gameTypeBadgeDetail = item.gameType
     ? `<span class="card-university">🎮 ${escapeHtml(item.gameType)}</span>` : '';

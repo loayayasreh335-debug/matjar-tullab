@@ -1,5 +1,5 @@
 // server.js
-// سيرفر تطبيق "سوقنا" - سوق مقايضة لطلاب الجامعات
+// سيرفر تطبيق "متجر الطلاب" - سوق مقايضة لطلاب الجامعات
 // يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
 // كلاهما مجاني للأبد بدون بطاقة ائتمان - لا يعتمد على القرص المحلي إطلاقاً
 
@@ -63,19 +63,8 @@ const JORDAN_UNIVERSITIES = [
 
 // قائمة تصنيفات الأغراض
 const CATEGORIES = [
-  'كتب دراسية',
-  'قرطاسية وأدوات مكتبية',
-  'إلكترونيات',
-  'أثاث ومستلزمات سكن',
-  'ملابس وأزياء',
-  'حسابات ألعاب',
-  'سيارات ومركبات',
-  'عقارات وسكن',
-  'أجهزة منزلية',
-  'وظائف وخدمات',
-  'حيوانات أليفة',
-  'رياضة وهوايات',
-  'أخرى'
+  'كتب دراسية', 'قرطاسية وأدوات مكتبية', 'إلكترونيات', 'أثاث ومستلزمات سكن',
+  'ملابس وأزياء', 'حسابات ألعاب', 'أخرى'
 ];
 
 // التصنيفات التي تحتاج تنبيه أمان خاص عند النشر
@@ -465,7 +454,7 @@ app.get('/item/:id', async (req, res) => {
     const imageUrl = item.imageUrls && item.imageUrls[0] ? item.imageUrls[0] : '';
 
     const html = injectOgTags(baseHtml, {
-      title: `${item.name} | سوقنا`,
+      title: `${item.name} | متجر الطلاب`,
       description: `متاح للمقايضة بـ: ${item.lookingFor} — ${item.description}`.slice(0, 200),
       image: imageUrl,
       url: fullUrl
@@ -503,7 +492,7 @@ connectDB()
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>الصفحة غير موجودة | سوقنا</title>
+          <title>الصفحة غير موجودة | متجر الطلاب</title>
           <style>
             body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
                    display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }

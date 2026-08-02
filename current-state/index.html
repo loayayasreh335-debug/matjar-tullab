@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>سوقنا | سوق مقايضة الكتب والأغراض الجامعية</title>
+  <title>متجر الطلاب | سوق مقايضة الكتب والأغراض الجامعية</title>
 
-  <link rel="icon" type="image/png" href="/logo.png"><text y=%22.9em%22 font-size=%2290%22><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"></text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="سوقنا | سوق مقايضة الكتب والأغراض الجامعية">
+  <meta property="og:title" content="متجر الطلاب | سوق مقايضة الكتب والأغراض الجامعية">
   <meta property="og:description" content="منصة مجانية وبسيطة لمقايضة الكتب الدراسية والأدوات الجامعية بين طلاب الجامعات">
   <meta property="og:image" content="">
   <meta property="og:url" content="">
@@ -22,8 +22,8 @@
   <header class="navbar">
     <div class="navbar-inner">
       <a href="/" class="logo">
-        <span class="logo-icon"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"></span>
-        <span>سوقنا</span>
+        <span class="logo-icon">🎓</span>
+        <span>متجر الطلاب</span>
       </a>
       <div class="navbar-actions">
         <button id="themeToggleBtn" class="btn-icon" title="تبديل المظهر">🌙</button>
@@ -51,7 +51,7 @@
             <option value="">📍 كل المحافظات</option>
           </select>
           <select id="filterUniversity">
-            <option value=""><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"> كل الجامعات</option>
+            <option value="">🎓 كل الجامعات</option>
           </select>
           <select id="filterCategory">
             <option value="">🏷️ كل التصنيفات</option>
@@ -137,10 +137,6 @@
               <input type="radio" name="adType" value="barter" required>
               <span>🔄 مقايضة</span>
             </label>
-            <label class="ad-type-option">
-              <input type="radio" name="adType" value="auction" required>
-              <span>🔨 مزاد</span>
-            </label>
           </div>
         </label>
 
@@ -153,20 +149,6 @@
           ماذا تريد بدلاً منه؟
           <input type="text" name="lookingFor" id="lookingForInput" placeholder="مثال: كتاب المحاسبة المالية 1">
         </label>
-
-        <label id="auctionStartingPriceField" style="display:none;">
-          سعر بداية المزاد (دينار أردني)
-          <input type="number" name="startingPrice" id="startingPriceInput" min="1" step="0.01" placeholder="مثال: 50">
-        </label>
-
-        <label id="auctionEndsAtField" style="display:none;">
-          وقت انتهاء المزاد
-          <input type="datetime-local" name="endsAt" id="endsAtInput">
-        </label>
-
-        <p id="auctionNotice" style="display:none;font-size:12px;color:#9ca3af;margin-top:-8px;">
-          ملاحظة: كل مزاد يخضع لمراجعة يدوية من الإدارة قبل نشره للعامة.
-        </p>
 
         <label>
           رقم الواتساب (مع رمز الدولة)
@@ -211,11 +193,11 @@
   <div id="aboutOverlay" class="overlay">
     <div class="modal">
       <div class="modal-header">
-        <h2>عن سوقنا <img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"></h2>
+        <h2>عن متجر الطلاب 🎓</h2>
         <button id="closeAboutBtn" class="btn-close">✕</button>
       </div>
       <p class="support-text">
-        سوقنا منصة مجانية وغير ربحية تساعد طلاب الجامعات على مقايضة الكتب الدراسية والأدوات الجامعية
+        متجر الطلاب منصة مجانية وغير ربحية تساعد طلاب الجامعات على مقايضة الكتب الدراسية والأدوات الجامعية
         بدل شرائها من جديد كل فصل. اعرض ما لا تحتاجه، وابحث عمّا تحتاجه، وتواصل مباشرة عبر واتساب — بكل بساطة.
       </p>
       <p class="support-text">
@@ -225,7 +207,7 @@
   </div>
 
   <footer class="footer">
-    <p>سوقنا © 2026 — منصة مقايضة غير ربحية بين الطلاب</p>
+    <p>متجر الطلاب © 2026 — منصة مقايضة غير ربحية بين الطلاب</p>
     <p class="developer-credit">تطوير: Loay Ayasrah</p>
     <div class="footer-links">
       <button id="openAboutBtn" class="link-btn">عن المنصة</button>
@@ -237,8 +219,8 @@
   <!-- نافذة ترحيب لأول زيارة -->
   <div id="welcomeOverlay" class="overlay">
     <div class="modal welcome-modal">
-      <span class="welcome-emoji"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;">👋</span>
-      <h2 class="welcome-title">أهلاً فيك بسوقنا!</h2>
+      <span class="welcome-emoji">🎓👋</span>
+      <h2 class="welcome-title">أهلاً فيك بمتجر الطلاب!</h2>
       <p class="support-text" style="text-align:center;">
         بادل كتبك الدراسية وأغراضك الجامعية مع طلاب من جامعتك بدل ما تشتريها من جديد كل فصل.
         اعرض، ابحث، وتواصل مباشرة عبر واتساب — كله مجاني وبسيط.
@@ -248,5 +230,7 @@
   </div>
 
   <script src="script.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
 </body>
 </html>

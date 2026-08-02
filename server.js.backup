@@ -1,5 +1,5 @@
 // server.js
-// سيرفر تطبيق "سوقنا" - سوق مقايضة لطلاب الجامعات
+// سيرفر تطبيق "متجر الطلاب" - سوق مقايضة لطلاب الجامعات
 // يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
 // كلاهما مجاني للأبد بدون بطاقة ائتمان - لا يعتمد على القرص المحلي إطلاقاً
 
@@ -15,37 +15,7 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LOAYLOAYLOAYLOAY123456789987654321';
-
-// ---------- نظام تذاكر دخول الأدمن (Admin Session Tokens) ----------
-// كلمة سر الأدمن لا تُرسل ولا تُخزّن على المتصفح أبداً - فقط تذكرة مؤقتة (token)
-const adminTokens = new Map(); // token -> وقت انتهاء الصلاحية
-const ADMIN_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // صلاحية 7 أيام
-
-function issueAdminToken() {
-  const token = crypto.randomBytes(24).toString('hex');
-  adminTokens.set(token, Date.now() + ADMIN_TOKEN_TTL_MS);
-  return token;
-}
-
-function isValidAdminToken(token) {
-  if (!token) return false;
-  const expiry = adminTokens.get(token);
-  if (!expiry) return false;
-  if (expiry < Date.now()) {
-    adminTokens.delete(token);
-    return false;
-  }
-  return true;
-}
-
-function requireAdminToken(req, res, next) {
-  const token = req.headers['x-admin-token'];
-  if (!isValidAdminToken(token)) {
-    return res.status(401).json({ error: 'انتهت صلاحية الجلسة أو غير مسجل دخول. يرجى تسجيل الدخول من جديد.' });
-  }
-  next();
-}
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // مدة صلاحية الإعلان قبل حذفه تلقائياً (بالمللي ثانية) = 30 يوماً
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
@@ -63,19 +33,8 @@ const JORDAN_UNIVERSITIES = [
 
 // قائمة تصنيفات الأغراض
 const CATEGORIES = [
-  'كتب دراسية',
-  'قرطاسية وأدوات مكتبية',
-  'إلكترونيات',
-  'أثاث ومستلزمات سكن',
-  'ملابس وأزياء',
-  'حسابات ألعاب',
-  'سيارات ومركبات',
-  'عقارات وسكن',
-  'أجهزة منزلية',
-  'وظائف وخدمات',
-  'حيوانات أليفة',
-  'رياضة وهوايات',
-  'أخرى'
+  'كتب دراسية', 'قرطاسية وأدوات مكتبية', 'إلكترونيات', 'أثاث ومستلزمات سكن',
+  'ملابس وأزياء', 'حسابات ألعاب', 'أخرى'
 ];
 
 // التصنيفات التي تحتاج تنبيه أمان خاص عند النشر
@@ -119,6 +78,7 @@ const UNIVERSITY_RELATED_CATEGORIES = ['كتب دراسية', 'قرطاسية و
 const DEVELOPER_WHATSAPP = '962771587863';
 
 // صورة افتراضية تُستخدم تلقائياً عندما لا يرفع المستخدم أي صورة للإعلان
+// (نص إنجليزي بسيط فقط بالرابط - خدمة placehold.co لا تدعم عرض الخطوط العربية بشكل صحيح)
 const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/800x600/e5e7eb/6b7280?text=No+Image';
 
 // أنواع الإعلان المتاحة
@@ -136,13 +96,14 @@ const mongoClient = new MongoClient(MONGODB_URI);
 
 async function connectDB() {
   await mongoClient.connect();
-  db = mongoClient.db();
+  db = mongoClient.db(); // اسم القاعدة يُقرأ من نهاية رابط الاتصال نفسه
   await db.collection('items').createIndex({ id: 1 }, { unique: true });
   await db.collection('items').createIndex({ createdAt: -1 });
   console.log('✅ تم الاتصال بقاعدة بيانات MongoDB Atlas بنجاح');
 }
 
 // ---------- إعداد Cloudinary (تخزين الصور الدائم) ----------
+// يقرأ تلقائياً متغير البيئة CLOUDINARY_URL إن وُجد
 if (!process.env.CLOUDINARY_URL) {
   console.error('❌ خطأ: متغير البيئة CLOUDINARY_URL غير موجود. راجع ملف .env أو إعدادات Render.');
   process.exit(1);
@@ -173,6 +134,7 @@ async function deleteImagesFromCloudinary(publicIds) {
 
 // ---------- دوال مساعدة ----------
 
+// توحيد شكل الإعلان (يدعم إعلانات قديمة إن وُجدت)
 function normalizeItem(item) {
   if (!item.imageUrls) item.imageUrls = [];
   if (!item.imagePublicIds) item.imagePublicIds = [];
@@ -180,18 +142,20 @@ function normalizeItem(item) {
   if (!item.gameType) item.gameType = '';
   if (!item.governorate) item.governorate = '';
   if (!item.area) item.area = '';
-  if (!item.adType) item.adType = 'barter';
+  if (!item.adType) item.adType = 'barter'; // الإعلانات القديمة كلها كانت مقايضة قبل هذه الميزة
   if (typeof item.price !== 'number') item.price = null;
   if (typeof item.views !== 'number') item.views = 0;
   if (typeof item.isSwapped !== 'boolean') item.isSwapped = false;
   return item;
 }
 
+// إخفاء الحقول الحساسة قبل إرسال الإعلان للعميل
 function toPublicItem(item) {
   const { ownerToken, imagePublicIds, _id, ...publicItem } = item;
   return publicItem;
 }
 
+// حذف الإعلانات المنتهية (أقدم من 30 يوماً) مع صورها من Cloudinary
 async function cleanupExpiredItems() {
   const cutoff = Date.now() - EXPIRY_MS;
   const expired = await db.collection('items').find({ createdAt: { $lt: cutoff } }).toArray();
@@ -205,8 +169,9 @@ async function cleanupExpiredItems() {
   }
 }
 
+// حد أقصى لعدد الإعلانات المسموح نشرها من نفس الجهاز خلال 24 ساعة (حماية بسيطة من السبام)
 const DAILY_POST_LIMIT = 5;
-const deviceLimitTracker = new Map();
+const deviceLimitTracker = new Map(); // deviceId => [timestamps]
 
 function isRateLimited(deviceId) {
   if (!deviceId) return false;
@@ -224,6 +189,7 @@ function recordPost(deviceId) {
   deviceLimitTracker.set(deviceId, timestamps);
 }
 
+// ---------- إعداد رفع الصور (Multer في الذاكرة - بدون حفظ محلي) ----------
 function fileFilter(req, file, cb) {
   const allowed = /jpeg|jpg|png|gif|webp/;
   const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
@@ -238,9 +204,12 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
+// ---------- الميدلوير العام ----------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------- المسارات (API Routes) ----------
 
 app.get('/api/universities', (req, res) => res.json(JORDAN_UNIVERSITIES));
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
@@ -348,6 +317,7 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
       return res.status(400).json({ error: 'يرجى اختيار نوع اللعبة' });
     }
 
+    // رفع الصور إلى Cloudinary (اختياري تماماً - لو ما رفع المستخدم أي صورة نستخدم صورة افتراضية)
     const uploaded = await Promise.all(
       (req.files || []).map(f => uploadImageToCloudinary(f.buffer))
     );
@@ -369,7 +339,7 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
       governorate: governorate.trim(),
       area: area.trim(),
       imageUrls: uploaded.length ? uploaded.map(u => u.url) : [PLACEHOLDER_IMAGE_URL],
-      imagePublicIds: uploaded.map(u => u.publicId),
+      imagePublicIds: uploaded.map(u => u.publicId), // فاضية لو استخدمنا الصورة الافتراضية (لا شيء نحذفه من Cloudinary لاحقاً)
       createdAt: Date.now(),
       isSwapped: false,
       views: 0,
@@ -425,21 +395,7 @@ app.delete('/api/items/:id', async (req, res) => {
   }
 });
 
-// حذف إعلان من لوحة تحكم الأدمن - يتطلب تذكرة دخول أدمن صالحة
-app.delete('/api/admin/items/:id', requireAdminToken, async (req, res) => {
-  try {
-    const item = await db.collection('items').findOne({ id: req.params.id });
-    if (!item) return res.status(404).json({ error: 'الإعلان غير موجود' });
-
-    await deleteImagesFromCloudinary(item.imagePublicIds);
-    await db.collection('items').deleteOne({ id: req.params.id });
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'تعذر حذف الإعلان' });
-  }
-});
-
+// تهريب النصوص قبل إدراجها داخل خصائص HTML
 function escapeAttr(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -465,7 +421,7 @@ app.get('/item/:id', async (req, res) => {
     const imageUrl = item.imageUrls && item.imageUrls[0] ? item.imageUrls[0] : '';
 
     const html = injectOgTags(baseHtml, {
-      title: `${item.name} | سوقنا`,
+      title: `${item.name} | متجر الطلاب`,
       description: `متاح للمقايضة بـ: ${item.lookingFor} — ${item.description}`.slice(0, 200),
       image: imageUrl,
       url: fullUrl
@@ -481,51 +437,50 @@ app.get('/university/:name', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// معالجة أخطاء Multer
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err) {
+    return res.status(400).json({ error: err.message });
+  }
+  next();
+});
+
+// صفحة 404 مخصصة
+app.use((req, res) => {
+  res.status(404).send(`
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>الصفحة غير موجودة | متجر الطلاب</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
+               display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
+        .box { max-width:380px; }
+        .emoji { font-size:60px; margin-bottom:10px; }
+        h1 { font-size:20px; margin:0 0 10px; }
+        p { color:#6b7280; font-size:14px; margin:0 0 20px; }
+        a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <div class="emoji">🔍📦</div>
+        <h1>هاي الصفحة مش موجودة</h1>
+        <p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
+        <a href="/">🏠 الصفحة الرئيسية</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // ---------- تشغيل السيرفر ----------
 connectDB()
   .then(() => {
-    require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
-    require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
-
-    // معالجة أخطاء Multer
-    app.use((err, req, res, next) => {
-      if (err instanceof multer.MulterError || err) {
-        return res.status(400).json({ error: err.message });
-      }
-      next();
-    });
-
-    // صفحة 404 مخصصة
-    app.use((req, res) => {
-      res.status(404).send(`
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>الصفحة غير موجودة | سوقنا</title>
-          <style>
-            body { font-family: Tahoma, Arial, sans-serif; background:#f5f6f8; color:#1f2430;
-                   display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; text-align:center; padding:20px; }
-            .box { max-width:380px; }
-            .emoji { font-size:60px; margin-bottom:10px; }
-            h1 { font-size:20px; margin:0 0 10px; }
-            p { color:#6b7280; font-size:14px; margin:0 0 20px; }
-            a { background:#ff7a1a; color:#fff; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; display:inline-block; }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <div class="emoji">🔍📦</div>
-            <h1>هاي الصفحة مش موجودة</h1>
-            <p>يمكن الرابط قديم أو انحذف الإعلان. ارجع للصفحة الرئيسية وتصفح باقي الإعلانات.</p>
-            <a href="/">🏠 الصفحة الرئيسية</a>
-          </div>
-        </body>
-        </html>
-      `);
-    });
-
+    require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD });
+  require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary });
     app.listen(PORT, () => {
       console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
       cleanupExpiredItems();
@@ -536,3 +491,4 @@ connectDB()
     console.error('❌ فشل الاتصال بقاعدة البيانات:', err.message);
     process.exit(1);
   });
+
