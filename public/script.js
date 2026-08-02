@@ -58,6 +58,7 @@ const closeWelcomeBtn = document.getElementById('closeWelcomeBtn');
 
 // ---------- الحالة العامة ----------
 let itemsCache = [];
+let auctionsCache = [];
 let showOnlyMine = false;
 
 // ---------- الوضع الليلي / الفاتح ----------
@@ -529,6 +530,65 @@ card.querySelectorAll('a[href^="/item/"]').forEach(link => {
 });  return card;
 }
 
+// ---------- عرض كروت المزادات (نظام منفصل عن البيع/المقايضة) ----------
+function auctionTimeLeftText(endsAt) {
+  const diff = endsAt - Date.now();
+  if (diff <= 0) return { text: 'انتهى المزاد', ended: true };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  let text = '';
+  if (days > 0) text = `⏰ متبقي ${days} يوم ${hours} ساعة`;
+  else if (hours > 0) text = `⏰ متبقي ${hours} ساعة ${mins} دقيقة`;
+  else text = `⏰ متبقي ${mins} دقيقة ${secs} ثانية`;
+  return { text, ended: false };
+}
+
+function renderAuctionCard(auction) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.cursor = 'pointer';
+
+  const imageHtml = auction.imageUrl
+    ? `<img class="card-image" src="${auction.imageUrl}" alt="${escapeHtml(auction.title)}" onerror="handleImageError(this)">`
+    : `<div class="card-image placeholder">🔨</div>`;
+
+  card.innerHTML = `
+    <div class="card-image-wrap">
+      ${imageHtml}
+    </div>
+    <div class="card-body">
+      <div class="card-badges-row">
+        <span class="card-category">🔨 مزاد</span>
+      </div>
+      <h3 class="card-title">${escapeHtml(auction.title)}</h3>
+      <p style="font-size:13px;color:var(--text-muted,#6b7280);margin:0 0 8px;">${escapeHtml(auction.description)}</p>
+      <div class="card-trade">💰 السعر الحالي: ${auction.currentBid} د.أ</div>
+      <div class="card-meta-row">
+        <span class="auction-timer" data-ends="${auction.endsAt}">${auctionTimeLeftText(auction.endsAt).text}</span>
+        <span>💵 عدد المزايدات: ${auction.bidsCount || 0}</span>
+      </div>
+      <button class="btn-whatsapp" style="width:100%;margin-top:8px;">🔨 ادخل وزايد</button>
+    </div>
+  `;
+
+  card.addEventListener('click', () => {
+    window.location.href = `/auction-detail.html?id=${auction.id}`;
+  });
+
+  return card;
+}
+
+function updateAuctionTimers() {
+  document.querySelectorAll('.auction-timer').forEach(el => {
+    const endsAt = parseInt(el.dataset.ends, 10);
+    const { text } = auctionTimeLeftText(endsAt);
+    el.textContent = text;
+  });
+}
+setInterval(updateAuctionTimers, 1000);
+
 // ---------- إجراءات الحذف وتبديل حالة المقايضة ----------
 async function deleteItem(itemId, ownerToken) {
   const confirmed = confirm('هل أنت متأكد أنك تريد حذف هذا الإعلان؟ لا يمكن التراجع عن هذا الإجراء.');
@@ -604,6 +664,17 @@ function applyFiltersAndRender() {
     } else {
       emptyState.innerHTML = `<p>لا توجد أغراض معروضة حالياً.</p><p>كن أول من يضيف غرضاً للمقايضة! 👇</p>`;
     }
+
+    // حتى لو ما في أغراض عادية، اعرض المزادات النشطة إن وُجدت
+    if (!showOnlyMine && !query && !uniFilter && !catFilter && auctionsCache.length > 0) {
+      emptyState.style.display = 'none';
+      const auctionHeader = document.createElement('div');
+      auctionHeader.className = 'items-count';
+      auctionHeader.style.cssText = 'flex-basis:100%;font-weight:700;';
+      auctionHeader.textContent = `🔨 ${auctionsCache.length} مزاد نشط`;
+      itemsGrid.appendChild(auctionHeader);
+      auctionsCache.forEach(auction => itemsGrid.appendChild(renderAuctionCard(auction)));
+    }
     return;
   }
 
@@ -611,6 +682,17 @@ function applyFiltersAndRender() {
   itemsCount.textContent = `${filtered.length} غرض معروض للمقايضة`;
 
   filtered.forEach(item => itemsGrid.appendChild(renderCard(item)));
+
+  // عرض المزادات النشطة بعد الأغراض العادية (بدون تطبيق فلاتر البيع/المقايضة عليها)
+  if (auctionsCache.length > 0) {
+    const auctionHeader = document.createElement('div');
+    auctionHeader.className = 'items-count';
+    auctionHeader.style.cssText = 'flex-basis:100%;margin-top:20px;font-weight:700;';
+    auctionHeader.textContent = `🔨 ${auctionsCache.length} مزاد نشط`;
+    itemsGrid.appendChild(auctionHeader);
+
+    auctionsCache.forEach(auction => itemsGrid.appendChild(renderAuctionCard(auction)));
+  }
 }
 
 searchInput.addEventListener('input', applyFiltersAndRender);
@@ -625,12 +707,16 @@ myAdsBtn.addEventListener('click', () => {
   applyFiltersAndRender();
 });
 
-// ---------- جلب كل الأغراض ----------
+// ---------- جلب كل الأغراض والمزادات ----------
 async function loadItems() {
   renderSkeletons();
   try {
-    const res = await fetch('/api/items');
-    itemsCache = await res.json();
+    const [itemsRes, auctionsRes] = await Promise.all([
+      fetch('/api/items'),
+      fetch('/api/auctions').catch(() => null)
+    ]);
+    itemsCache = await itemsRes.json();
+    auctionsCache = auctionsRes && auctionsRes.ok ? await auctionsRes.json() : [];
     applyFiltersAndRender();
   } catch (err) {
     console.error('فشل تحميل الأغراض:', err);
@@ -735,6 +821,10 @@ itemForm.addEventListener('submit', async (e) => {
       const res = await fetch('/api/auctions', { method: 'POST', body: auctionData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'حدث خطأ غير متوقع');
+
+      if (data.ownerToken && data.id) {
+        localStorage.setItem(`auctionOwner:${data.id}`, data.ownerToken);
+      }
 
       itemForm.reset();
       updateUniversityFieldVisibility();
