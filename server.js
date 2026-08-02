@@ -1,3 +1,27 @@
+
+const admin = require('firebase-admin');
+
+const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+  : undefined;
+
+if (privateKey) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey,
+      }),
+    });
+    console.log('Firebase initialized successfully');
+  } catch (e) {
+    console.log('Firebase init error:', e.message);
+  }
+} else {
+  console.log('FIREBASE_PRIVATE_KEY is missing');
+}
+
 // server.js
 // سيرفر تطبيق "سوقنا" - سوق مقايضة لطلاب الجامعات
 // يستخدم Express + Multer، والتخزين الدائم يكون على MongoDB Atlas (بيانات) و Cloudinary (صور)
