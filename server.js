@@ -1,3 +1,4 @@
+process.on("uncaughtException", (err) => { console.log("Catch err:", err.message); });
 )
     });
     console.log('✅ Firebase initialized successfully');
