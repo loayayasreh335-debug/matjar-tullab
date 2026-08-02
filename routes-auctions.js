@@ -9,14 +9,21 @@ module.exports = function registerAuctionRoutes(app, ctx) {
     uploadImageToCloudinary,
     deleteImagesFromCloudinary,
     upload,
-    ADMIN_PASSWORD,
-    issueAdminToken,
-    requireAdminToken
+    ADMIN_PASSWORD
   } = ctx;
 
   // ---------- إعداد الفهارس ----------
   db.collection('auctions').createIndex({ id: 1 }, { unique: true }).catch(() => {});
   db.collection('auctions').createIndex({ isApproved: 1, endsAt: 1 }).catch(() => {});
+
+  // ---------- ميدلوير حماية مسارات الأدمن ----------
+  function requireAdmin(req, res, next) {
+    const password = req.headers['x-admin-password'];
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'غير مصرح. يرجى تسجيل الدخول كأدمن.' });
+    }
+    next();
+  }
 
   // إخفاء الحقول الحساسة قبل إرسال المزاد للواجهة العامة
   function toPublicAuction(a) {
@@ -139,18 +146,17 @@ module.exports = function registerAuctionRoutes(app, ctx) {
 
   // ==================== مسارات المطور/الأدمن (Admin) ====================
 
-  // تسجيل دخول الأدمن - يتحقق من كلمة السر مرة وحدة ويرجع تذكرة دخول مؤقتة
-  // كلمة السر نفسها لا تُخزّن أبداً على المتصفح، فقط هذه التذكرة
+  // تسجيل دخول الأدمن (كلمة سر واحدة بسيطة، بدون حسابات - متوافق مع فلسفة المشروع)
   app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
     if (password && password === ADMIN_PASSWORD) {
-      return res.json({ success: true, token: issueAdminToken() });
+      return res.json({ success: true });
     }
     res.status(401).json({ success: false, error: 'كلمة السر غير صحيحة' });
   });
 
   // عرض المزادات لمراجعتها (افتراضياً: المعلقة فقط، أو ?status=active/rejected/ended للفلترة)
-  app.get('/api/admin/auctions', requireAdminToken, async (req, res) => {
+  app.get('/api/admin/auctions', requireAdmin, async (req, res) => {
     try {
       const status = req.query.status;
       const filter = status ? { status } : {};
@@ -163,7 +169,7 @@ module.exports = function registerAuctionRoutes(app, ctx) {
   });
 
   // قبول وتفعيل المزاد (بعد التأكد اليدوي من استلام رسوم الـ 50 دينار)
-  app.patch('/api/admin/auctions/:id/approve', requireAdminToken, async (req, res) => {
+  app.patch('/api/admin/auctions/:id/approve', requireAdmin, async (req, res) => {
     try {
       const result = await db.collection('auctions').findOneAndUpdate(
         { id: req.params.id },
@@ -180,7 +186,7 @@ module.exports = function registerAuctionRoutes(app, ctx) {
   });
 
   // رفض مزاد (يبقى بالسجل للمراجعة لكن لا يظهر للعامة)
-  app.patch('/api/admin/auctions/:id/reject', requireAdminToken, async (req, res) => {
+  app.patch('/api/admin/auctions/:id/reject', requireAdmin, async (req, res) => {
     try {
       const result = await db.collection('auctions').findOneAndUpdate(
         { id: req.params.id },
@@ -197,7 +203,7 @@ module.exports = function registerAuctionRoutes(app, ctx) {
   });
 
   // حذف مزاد نهائياً (مع صورته من Cloudinary لو موجودة)
-  app.delete('/api/admin/auctions/:id', requireAdminToken, async (req, res) => {
+  app.delete('/api/admin/auctions/:id', requireAdmin, async (req, res) => {
     try {
       const auction = await db.collection('auctions').findOne({ id: req.params.id });
       if (!auction) return res.status(404).json({ error: 'المزاد غير موجود' });

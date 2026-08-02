@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تفاصيل المزاد | متجر الطلاب</title>
+<style>
+  :root {
+    --primary: #ff7a1a;
+    --primary-dark: #e2660a;
+    --bg: #f5f6f8;
+    --card-bg: #ffffff;
+    --text-dark: #1f2430;
+    --text-muted: #6b7280;
+  }
+  html[data-theme="dark"] {
+    --bg: #14161b;
+    --card-bg: #1e2128;
+    --text-dark: #eef0f3;
+    --text-muted: #9aa1ac;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Tahoma, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-dark);
+    margin: 0;
+    padding: 0 16px 60px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  header a { color: var(--primary); text-decoration: none; font-weight: 700; }
+  .container { max-width: 640px; margin: 0 auto; }
+
+  .card-box {
+    background: var(--card-bg);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+  }
+  .auction-image {
+    width: 100%;
+    max-height: 320px;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #eee;
+    margin-bottom: 14px;
+  }
+  .placeholder-image {
+    width: 100%;
+    height: 220px;
+    border-radius: 12px;
+    background: #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    margin-bottom: 14px;
+  }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  .desc { color: var(--text-muted); font-size: 14px; margin: 0 0 16px; line-height: 1.6; }
+
+  .price-box {
+    background: rgba(255,122,26,0.1);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .price-box .label { font-size: 13px; color: var(--text-muted); }
+  .price-box .amount { font-size: 22px; font-weight: 700; color: var(--primary); }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .timer { font-weight: 700; color: #b42318; }
+  .timer.ended { color: var(--text-muted); }
+
+  label { display: block; font-size: 13px; color: var(--text-muted); margin: 12px 0 4px; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text-dark);
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    border: none;
+    padding: 13px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 14px;
+    text-align: center;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:disabled { opacity: 0.6; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-success { background: #16a34a; color: #fff; }
+  .btn-whatsapp { background: #25d366; color: #fff; }
+
+  .msg { font-size: 13px; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }
+  .msg.error { background: #fde8e8; color: #b42318; display: block; }
+  .msg.success { background: #e7f6ec; color: #1a7f37; display: block; }
+
+  .note-box {
+    background: rgba(0,0,0,0.04);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 14px;
+  }
+  .status-badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .status-active { background: #dcfce7; color: #166534; }
+  .status-sold { background: #dbeafe; color: #1e40af; }
+  .status-ended { background: #e5e7eb; color: #374151; }
+
+  .loading, .error-state { text-align: center; color: var(--text-muted); padding: 60px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">🏠 الصفحة الرئيسية</a>
+  <span></span>
+</header>
+
+<div class="container">
+  <div id="loadingState" class="loading">جارِ التحميل...</div>
+  <div id="errorState" class="error-state" style="display:none;">تعذر تحميل المزاد. ربما تم حذفه أو لم يعد متاحاً.</div>
+  <div id="content" style="display:none;"></div>
+</div>
+
+<script>
+// تفعيل نفس الوضع الليلي المستخدم بباقي الموقع
+if (localStorage.getItem('theme') === 'dark') {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+const params = new URLSearchParams(location.search);
+const auctionId = params.get('id');
+
+const loadingState = document.getElementById('loadingState');
+const errorState = document.getElementById('errorState');
+const content = document.getElementById('content');
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function timeLeftText(endsAt) {
+  const diff = endsAt - Date.now();
+  if (diff <= 0) return { text: 'انتهى وقت المزاد', ended: true };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  let text = '';
+  if (days > 0) text = `⏰ متبقي ${days} يوم ${hours} ساعة`;
+  else if (hours > 0) text = `⏰ متبقي ${hours} ساعة ${mins} دقيقة`;
+  else text = `⏰ متبقي ${mins} دقيقة ${secs} ثانية`;
+  return { text, ended: false };
+}
+
+function getOwnerToken(id) {
+  return localStorage.getItem(`auctionOwner:${id}`);
+}
+function getBidderInfo(id) {
+  const raw = localStorage.getItem(`auctionBidder:${id}`);
+  return raw ? JSON.parse(raw) : null;
+}
+function saveBidderInfo(id, bidderToken, whatsapp) {
+  localStorage.setItem(`auctionBidder:${id}`, JSON.stringify({ bidderToken, whatsapp }));
+}
+function clearBidderInfo(id) {
+  localStorage.removeItem(`auctionBidder:${id}`);
+}
+
+let auction = null;
+
+async function load() {
+  if (!auctionId) {
+    loadingState.style.display = 'none';
+    errorState.style.display = 'block';
+    return;
+  }
+  try {
+    const res = await fetch(`/api/auctions/${auctionId}`);
+    if (!res.ok) throw new Error('not found');
+    auction = await res.json();
+    loadingState.style.display = 'none';
+    content.style.display = 'block';
+    render();
+  } catch (err) {
+    loadingState.style.display = 'none';
+    errorState.style.display = 'block';
+  }
+}
+
+function render() {
+  const isOwner = getOwnerToken(auction.id) !== null;
+  const bidderInfo = getBidderInfo(auction.id);
+  const { text: timeText, ended } = timeLeftText(auction.endsAt);
+
+  const statusLabels = { active: '✅ نشط', sold: '🎉 تم البيع', ended: '🏁 منتهي' };
+  const statusClass = auction.status === 'sold' ? 'status-sold' : (ended ? 'status-ended' : 'status-active');
+  const statusText = auction.status === 'sold' ? statusLabels.sold : (ended ? statusLabels.ended : statusLabels.active);
+
+  const imageHtml = auction.imageUrl
+    ? `<img class="auction-image" src="${auction.imageUrl}" alt="${escapeHtml(auction.title)}">`
+    : `<div class="placeholder-image">🔨</div>`;
+
+  let actionHtml = '';
+
+  if (isOwner) {
+    actionHtml = `
+      <div class="note-box">🔒 هذا مزادك الخاص. لا يمكنك المزايدة عليه.</div>
+      ${auction.status !== 'sold' && auction.bidsCount > 0
+        ? `<button class="btn btn-success" id="finalizeBtn">✅ إنهاء المزاد وبيعه لأعلى مزايد</button>`
+        : auction.bidsCount === 0
+          ? `<div class="note-box">لا توجد مزايدات بعد. انتظر حتى تصل مزايدات قبل إنهاء المزاد.</div>`
+          : ''}
+      <div id="finalizeResult"></div>
+    `;
+  } else if (auction.status === 'sold') {
+    actionHtml = `<div class="note-box">تم بيع هذا المزاد بالفعل لأعلى مزايد.</div>`;
+  } else if (ended) {
+    actionHtml = `<div class="note-box">انتهى وقت هذا المزاد ولم يعد يقبل مزايدات جديدة.</div>`;
+  } else if (bidderInfo) {
+    actionHtml = `
+      <div class="note-box">📌 أنت صاحب أعلى مزايدة حالياً على هذا المزاد.</div>
+      <button class="btn btn-danger" id="withdrawBtn">❌ سحب مزايدتي</button>
+    `;
+  } else {
+    actionHtml = `
+      <label>رقم الواتساب الخاص بك *</label>
+      <input type="text" id="bidWhatsapp" placeholder="مثال: 962791234567">
+      <label>مبلغ المزايدة (دينار) *</label>
+      <input type="number" id="bidAmount" min="${auction.currentBid + 1}" placeholder="أعلى من ${auction.currentBid}">
+      <button class="btn btn-primary" id="bidBtn">مزايدة</button>
+    `;
+  }
+
+  content.innerHTML = `
+    <div class="card-box">
+      <span class="status-badge ${statusClass}">${statusText}</span>
+      ${imageHtml}
+      <h1>${escapeHtml(auction.title)}</h1>
+      <p class="desc">${escapeHtml(auction.description)}</p>
+      <div class="price-box">
+        <span class="label">السعر الحالي</span>
+        <span class="amount">${auction.currentBid} د.أ</span>
+      </div>
+      <div class="meta-row">
+        <span class="timer ${ended ? 'ended' : ''}" id="timerEl">${timeText}</span>
+        <span>عدد المزايدات: ${auction.bidsCount || 0}</span>
+      </div>
+      <div id="actionArea">${actionHtml}</div>
+      <a class="btn btn-whatsapp" target="_blank" rel="noopener" href="https://wa.me/${auction.whatsapp}">💬 تواصل مع صاحب المزاد عبر واتساب</a>
+      <div class="msg" id="formMsg"></div>
+    </div>
+  `;
+
+  wireActions();
+}
+
+function wireActions() {
+  const bidBtn = document.getElementById('bidBtn');
+  const withdrawBtn = document.getElementById('withdrawBtn');
+  const finalizeBtn = document.getElementById('finalizeBtn');
+  const formMsg = document.getElementById('formMsg');
+
+  if (bidBtn) {
+    bidBtn.addEventListener('click', async () => {
+      const whatsapp = document.getElementById('bidWhatsapp').value.trim();
+      const amount = parseFloat(document.getElementById('bidAmount').value);
+      formMsg.className = 'msg';
+      formMsg.textContent = '';
+
+      if (!whatsapp) {
+        formMsg.className = 'msg error';
+        formMsg.textContent = 'يرجى إدخال رقم الواتساب';
+        return;
+      }
+      if (!amount || amount <= auction.currentBid) {
+        formMsg.className = 'msg error';
+        formMsg.textContent = `يجب أن تكون المزايدة أعلى من ${auction.currentBid}`;
+        return;
+      }
+
+      bidBtn.disabled = true;
+      bidBtn.textContent = 'جارِ الإرسال...';
+      try {
+        const res = await fetch(`/api/auctions/${auction.id}/bid`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount, whatsapp })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'حدث خطأ');
+
+        saveBidderInfo(auction.id, data.bidderToken, whatsapp);
+        auction = data;
+        render();
+      } catch (err) {
+        formMsg.className = 'msg error';
+        formMsg.textContent = '❌ ' + err.message;
+        bidBtn.disabled = false;
+        bidBtn.textContent = 'مزايدة';
+      }
+    });
+  }
+
+  if (withdrawBtn) {
+    withdrawBtn.addEventListener('click', async () => {
+      if (!confirm('تأكيد سحب مزايدتك؟')) return;
+      const bidderInfo = getBidderInfo(auction.id);
+      withdrawBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/auctions/${auction.id}/withdraw-bid`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bidderToken: bidderInfo.bidderToken })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'حدث خطأ');
+
+        clearBidderInfo(auction.id);
+        auction = data;
+        render();
+      } catch (err) {
+        formMsg.className = 'msg error';
+        formMsg.textContent = '❌ ' + err.message;
+        withdrawBtn.disabled = false;
+      }
+    });
+  }
+
+  if (finalizeBtn) {
+    finalizeBtn.addEventListener('click', async () => {
+      if (!confirm('تأكيد إنهاء المزاد وبيعه لأعلى مزايد؟ سيتم إنشاء جلسة وسيط آمن بينك وبين المزايد الفائز.')) return;
+      finalizeBtn.disabled = true;
+      finalizeBtn.textContent = 'جارِ الإنهاء...';
+
+      try {
+        const ownerToken = getOwnerToken(auction.id);
+        const finalizeRes = await fetch(`/api/auctions/${auction.id}/finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ownerToken })
+        });
+        const finalizeData = await finalizeRes.json();
+        if (!finalizeRes.ok) throw new Error(finalizeData.error || 'تعذر إنهاء المزاد');
+
+        // إنشاء جلسة وسيط آمن تلقائياً بين صاحب المزاد والفائز
+        const escrowRes = await fetch('/api/escrow/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sellerWhatsapp: finalizeData.sellerWhatsapp,
+            buyerWhatsapp: finalizeData.buyerWhatsapp,
+            gameType: '',
+            itemId: finalizeData.auctionId,
+            dealAmount: finalizeData.dealAmount
+          })
+        });
+        const escrowData = await escrowRes.json();
+        if (!escrowRes.ok) throw new Error(escrowData.error || 'تم بيع المزاد لكن تعذر إنشاء جلسة الوسيط');
+
+        const sellerLink = `${location.origin}/escrow-room.html?id=${escrowData.id}&token=${escrowData.sellerToken}&role=seller`;
+        const buyerLink = `${location.origin}/escrow-room.html?id=${escrowData.id}&token=${escrowData.buyerToken}&role=buyer`;
+
+        document.getElementById('finalizeResult').innerHTML = `
+          <div class="note-box" style="border:1px solid var(--primary);">
+            <p>🎉 تم بيع المزاد بنجاح! تم إنشاء جلسة وسيط آمن.</p>
+            <a class="btn btn-primary" href="${sellerLink}">افتح غرفة الوسيط الآن (لك أنت)</a>
+            <p style="margin-top:10px;">أرسل هذا الرابط للمزايد الفائز عبر واتساب حتى يدخل غرفته الخاصة:</p>
+            <input type="text" readonly value="${buyerLink}" onclick="this.select()">
+          </div>
+        `;
+        finalizeBtn.remove();
+      } catch (err) {
+        formMsg.className = 'msg error';
+        formMsg.textContent = '❌ ' + err.message;
+        finalizeBtn.disabled = false;
+        finalizeBtn.textContent = '✅ إنهاء المزاد وبيعه لأعلى مزايد';
+      }
+    });
+  }
+}
+
+setInterval(() => {
+  if (!auction) return;
+  const timerEl = document.getElementById('timerEl');
+  if (!timerEl) return;
+  const { text, ended } = timeLeftText(auction.endsAt);
+  timerEl.textContent = text;
+  timerEl.classList.toggle('ended', ended);
+}, 1000);
+
+load();
+</script>
+
+</body>
+</html>
