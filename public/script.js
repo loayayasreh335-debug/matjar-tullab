@@ -465,7 +465,7 @@ function renderCard(item) {
     : '';
 
   const universityBadge = item.university
-    ? `<span class="card-university"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"> ${escapeHtml(item.university)}</span>` : '';
+    ? `<span class="card-university">🎓 ${escapeHtml(item.university)}</span>` : '';
 
   const gameTypeBadge = item.gameType
     ? `<span class="card-university">🎮 ${escapeHtml(item.gameType)}</span>` : '';
@@ -922,7 +922,7 @@ function renderItemDetail(item) {
     : '';
 
   const universityBadgeDetail = item.university
-    ? `<span class="card-university"><img src="/logo.png" alt="سوقنا" style="height:40px;vertical-align:middle;"> ${escapeHtml(item.university)}</span>` : '';
+    ? `<span class="card-university">🎓 ${escapeHtml(item.university)}</span>` : '';
 
   const gameTypeBadgeDetail = item.gameType
     ? `<span class="card-university">🎮 ${escapeHtml(item.gameType)}</span>` : '';
