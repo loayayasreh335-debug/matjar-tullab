@@ -1091,3 +1091,19 @@ html[data-theme="dark"] .welcome-title {
   height: auto;
   margin-bottom: 2px;
 }
+
+/* ===== زر المحادثة الداخلية (صنف مستقل عن btn-share) ===== */
+.btn-chat {
+  background: var(--input-bg);
+  color: var(--text-dark);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 1;
+}
+.btn-chat:hover {
+  background: var(--border);
+}
