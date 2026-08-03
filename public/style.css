@@ -150,14 +150,9 @@ html[data-theme="dark"] .logo {
   text-decoration: none;
 }
 
-.logo-icon {
-  font-size: 22px;
-}
 
-.logo-icon img {
-  border-radius: 50%;
-  object-fit: cover;
-}
+
+
 
 .navbar-actions {
   display: flex;
@@ -1070,31 +1065,21 @@ html[data-theme="dark"] .welcome-title {
 }
 .escrow-whatsapp-btn { background: #25D366; color: #fff; }
 
-
-/* ===== تحديث: قص اللوغو ليظهر الشعار الدائري فقط بدون النص أسفله ===== */
+/* ===== اللوغو النهائي: أيقونة دائرية + نجمة فوق النص (نسخة نظيفة نهائية) ===== */
 .logo-icon {
-  width: 42px !important;
-  height: 42px !important;
-  border-radius: 50% !important;
-  overflow: hidden !important;
-  display: inline-flex !important;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  position: relative;
 }
 .logo-icon img {
-  position: absolute;
-  width: 160px !important;
-  max-width: none !important;
-  height: auto !important;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 0 !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
 }
-
-/* ===== النجمة فوق كلمة سوقنا بالهيدر ===== */
 .logo-text-wrap {
   display: flex;
   flex-direction: column;
