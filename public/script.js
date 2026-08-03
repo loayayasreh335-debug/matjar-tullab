@@ -1,3 +1,4 @@
+window.onerror = function(msg, url, line, col, error) { alert('❌ خطأ برمجي: ' + msg + ' | سطر: ' + line); };
 // script.js - منطق الواجهة الأمامية
 
 // ---------- عناصر DOM ----------
