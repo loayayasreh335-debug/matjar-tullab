@@ -1069,3 +1069,23 @@ html[data-theme="dark"] .welcome-title {
   color: #111; font-weight: 600; font-size: 14px;
 }
 .escrow-whatsapp-btn { background: #25D366; color: #fff; }
+
+
+/* ===== تحديث: قص اللوغو ليظهر الشعار الدائري فقط بدون النص أسفله ===== */
+.logo-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.logo-icon img {
+  width: 340%;
+  max-width: none;
+  height: auto;
+  transform: translateY(-8%);
+  border-radius: 0;
+}

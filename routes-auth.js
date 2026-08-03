@@ -71,6 +71,15 @@ module.exports = function registerAuthRoutes(app, deps) {
   // يسمح لملفات routes الأخرى (chat, lostfound...) تستخدم نفس دالة التحقق
   app.locals.requireUserAuth = requireUserAuth;
 
+  // تسمح لملفات أخرى (زي نشر إعلان) تتحقق من هوية المستخدم اختيارياً بدون ما ترفض الطلب لو مش مسجل
+  function getUidFromToken(token) {
+    if (!token) return null;
+    const session = userSessions.get(token);
+    if (!session || session.expiry < Date.now()) return null;
+    return session.uid;
+  }
+  app.locals.getUidFromToken = getUidFromToken;
+
   // ---------- تسجيل الدخول ----------
   app.post('/api/auth/google', async (req, res) => {
     try {

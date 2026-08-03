@@ -454,6 +454,10 @@ function renderCard(item) {
          💬 تواصل عبر واتساب
        </a>`;
 
+  const currentUserForChat = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  const chatBtnHtml = (item.ownerUid && !isOwner && (!currentUserForChat || currentUserForChat.uid !== item.ownerUid))
+    ? `<button class="btn-share" onclick="startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})">💬 محادثة</button>`
+    : '';
 
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
@@ -498,6 +502,7 @@ function renderCard(item) {
       </div>
       <div class="card-actions-row">
         ${whatsappHtml}
+        ${chatBtnHtml}
         <button class="btn-share" data-id="${item.id}">🔗 مشاركة</button>
         <button class="btn-copy-link" data-id="${item.id}">📋 نسخ</button>
       </div>
@@ -852,7 +857,7 @@ itemForm.addEventListener('submit', async (e) => {
 
     const res = await fetch('/api/items', {
       method: 'POST',
-      headers: { 'X-Device-Id': getDeviceId() },
+      headers: { 'X-Device-Id': getDeviceId(), 'x-user-token': (typeof getSessionToken === 'function' ? (getSessionToken() || '') : '') },
       body: formData
     });
     const data = await res.json();
@@ -908,6 +913,11 @@ function renderItemDetail(item) {
          💬 تواصل عبر واتساب
        </a>`;
 
+  const currentUserForChat = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  const chatBtnHtml = (item.ownerUid && !isOwner && (!currentUserForChat || currentUserForChat.uid !== item.ownerUid))
+    ? `<button class="btn-share" onclick="startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})">💬 محادثة</button>`
+    : '';
+
   const ownerActionsHtml = isOwner
     ? `<div class="card-owner-actions">
          <button class="btn-swap ${item.isSwapped ? 'active' : ''}" id="detailSwapBtn">
@@ -956,6 +966,7 @@ function renderItemDetail(item) {
         </div>
         <div class="card-actions-row">
           ${whatsappHtml}
+          ${chatBtnHtml}
             ${escrowHtml}
           <button class="btn-share" id="detailShareBtn">🔗 مشاركة</button>
           <button class="btn-copy-link" id="detailCopyLinkBtn">📋 نسخ الرابط</button>

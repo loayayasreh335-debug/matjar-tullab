@@ -183,6 +183,7 @@ function normalizeItem(item) {
   if (typeof item.price !== 'number') item.price = null;
   if (typeof item.views !== 'number') item.views = 0;
   if (typeof item.isSwapped !== 'boolean') item.isSwapped = false;
+  if (!item.ownerUid) item.ownerUid = null;
   return item;
 }
 
@@ -353,6 +354,8 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
 
     const cleanedWhatsapp = whatsapp.trim().replace(/[^\d+]/g, '');
     const ownerToken = crypto.randomBytes(16).toString('hex');
+    const userToken = req.headers['x-user-token'];
+    const ownerUid = (app.locals.getUidFromToken && app.locals.getUidFromToken(userToken)) || null;
 
     const newItem = {
       id: Date.now().toString(36) + Math.round(Math.random() * 1e6).toString(36),
@@ -372,7 +375,8 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
       createdAt: Date.now(),
       isSwapped: false,
       views: 0,
-      ownerToken
+      ownerToken,
+      ownerUid
     };
 
     await db.collection('items').insertOne(newItem);
