@@ -382,7 +382,7 @@ app.post('/api/items', upload.array('images', MAX_IMAGES), async (req, res) => {
     const cleanedWhatsapp = whatsapp.trim().replace(/[^\d+]/g, '');
     const ownerToken = crypto.randomBytes(16).toString('hex');
     const userToken = req.headers['x-user-token'];
-    const ownerUid = (app.locals.getUidFromToken && app.locals.getUidFromToken(userToken)) || null;
+    const ownerUid = (app.locals.getUidFromToken && await app.locals.getUidFromToken(userToken)) || null;
     console.log('🔍 DEBUG نشر إعلان — userToken:', userToken ? userToken.slice(0,8)+'...' : 'مفقود', '| getUidFromToken موجودة؟', typeof app.locals.getUidFromToken, '| ownerUid الناتج:', ownerUid);
 
     const newItem = {

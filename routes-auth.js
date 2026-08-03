@@ -40,21 +40,22 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   db.collection('users').createIndex({ uid: 1 }, { unique: true }).catch(console.error);
 
-  // ---------- جلسات المستخدمين (تذكرة دخول مؤقتة، بدون كوكيز) ----------
-  const userSessions = new Map(); // sessionToken -> { uid, expiry }
+  // ---------- جلسات المستخدمين (محفوظة بقاعدة البيانات - تضل موجودة حتى لو أعاد السيرفر التشغيل) ----------
+  db.collection('sessions').createIndex({ token: 1 }, { unique: true }).catch(console.error);
+  db.collection('sessions').createIndex({ expiry: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
   const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // صلاحية 30 يوم
 
-  function issueSessionToken(uid) {
+  async function issueSessionToken(uid) {
     const token = crypto.randomBytes(24).toString('hex');
-    userSessions.set(token, { uid, expiry: Date.now() + SESSION_TTL_MS });
+    await db.collection('sessions').insertOne({ token, uid, expiry: new Date(Date.now() + SESSION_TTL_MS) });
     return token;
   }
 
   async function requireUserAuth(req, res, next) {
     const token = req.headers['x-user-token'];
-    const session = token ? userSessions.get(token) : null;
-    if (!session || session.expiry < Date.now()) {
-      if (session) userSessions.delete(token);
+    const session = token ? await db.collection('sessions').findOne({ token }) : null;
+    if (!session || session.expiry < new Date()) {
+      if (session) await db.collection('sessions').deleteOne({ token });
       return res.status(401).json({ error: 'يجب تسجيل الدخول أولاً' });
     }
     try {
@@ -72,10 +73,10 @@ module.exports = function registerAuthRoutes(app, deps) {
   app.locals.requireUserAuth = requireUserAuth;
 
   // تسمح لملفات أخرى (زي نشر إعلان) تتحقق من هوية المستخدم اختيارياً بدون ما ترفض الطلب لو مش مسجل
-  function getUidFromToken(token) {
+  async function getUidFromToken(token) {
     if (!token) return null;
-    const session = userSessions.get(token);
-    if (!session || session.expiry < Date.now()) return null;
+    const session = await db.collection('sessions').findOne({ token });
+    if (!session || session.expiry < new Date()) return null;
     return session.uid;
   }
   app.locals.getUidFromToken = getUidFromToken;
@@ -107,7 +108,7 @@ module.exports = function registerAuthRoutes(app, deps) {
         { upsert: true }
       );
 
-      const sessionToken = issueSessionToken(uid);
+      const sessionToken = await issueSessionToken(uid);
       const user = await db.collection('users').findOne({ uid });
 
       res.json({
@@ -129,9 +130,9 @@ module.exports = function registerAuthRoutes(app, deps) {
     });
   });
 
-  app.post('/api/auth/logout', (req, res) => {
+  app.post('/api/auth/logout', async (req, res) => {
     const token = req.headers['x-user-token'];
-    if (token) userSessions.delete(token);
+    if (token) await db.collection('sessions').deleteOne({ token });
     res.json({ success: true });
   });
 };
