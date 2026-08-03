@@ -456,7 +456,7 @@ function renderCard(item) {
 
   const currentUserForChat = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   const chatBtnHtml = (item.ownerUid && !isOwner && (!currentUserForChat || currentUserForChat.uid !== item.ownerUid))
-    ? `<button class="btn-chat" onclick="try{startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})}catch(e){alert('خطأ بالمحادثة: '+e.message)}">💬 محادثة</button>`
+    ? `<button class="btn-chat" onclick="alert('تم الضغط'); try{startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})}catch(e){alert('خطأ بالمحادثة: '+e.message)}">💬 محادثة</button>`
     : '';
 
   const ownerActionsHtml = isOwner
@@ -915,7 +915,7 @@ function renderItemDetail(item) {
 
   const currentUserForChat = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   const chatBtnHtml = (item.ownerUid && !isOwner && (!currentUserForChat || currentUserForChat.uid !== item.ownerUid))
-    ? `<button class="btn-chat" onclick="try{startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})}catch(e){alert('خطأ بالمحادثة: '+e.message)}">💬 محادثة</button>`
+    ? `<button class="btn-chat" onclick="alert('تم الضغط'); try{startChatWith({itemType:'item', itemId:'${item.id}', itemName:'${escapeHtml(item.name).replace(/'/g, "\\'")}', otherUid:'${item.ownerUid}'})}catch(e){alert('خطأ بالمحادثة: '+e.message)}">💬 محادثة</button>`
     : '';
 
   const ownerActionsHtml = isOwner
