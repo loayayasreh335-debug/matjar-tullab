@@ -12,8 +12,35 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 const cloudinary = require('cloudinary').v2;
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+const onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('register', (uid) => {
+    if (!uid) return;
+    if (!onlineUsers.has(uid)) onlineUsers.set(uid, new Set());
+    onlineUsers.get(uid).add(socket.id);
+    socket.data.uid = uid;
+  });
+  socket.on('disconnect', () => {
+    const uid = socket.data.uid;
+    if (uid && onlineUsers.has(uid)) {
+      onlineUsers.get(uid).delete(socket.id);
+      if (onlineUsers.get(uid).size === 0) onlineUsers.delete(uid);
+    }
+  });
+});
+
+function emitToUser(uid, event, payload) {
+  const sockets = onlineUsers.get(uid);
+  if (!sockets) return;
+  for (const socketId of sockets) io.to(socketId).emit(event, payload);
+}
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LOAYLOAYLOAYLOAY123456789987654321';
 
@@ -489,7 +516,7 @@ app.get('/university/:name', (req, res) => {
 connectDB()
   .then(() => {
     require('./routes-auth')(app, { db, crypto });
-    require('./routes-chat')(app, { db });
+    require('./routes-chat')(app, { db, io, emitToUser });
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
     require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
     require('./routes-lostfound')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, requireAdminToken, JORDAN_LOCATIONS, requireUserAuth: app.locals.requireUserAuth });
@@ -533,7 +560,7 @@ connectDB()
       `);
     });
 
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`✅ السيرفر يعمل الآن على: http://localhost:${PORT}`);
       cleanupExpiredItems();
       setInterval(cleanupExpiredItems, 12 * 60 * 60 * 1000);
