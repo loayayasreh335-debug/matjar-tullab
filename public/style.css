@@ -1073,19 +1073,23 @@ html[data-theme="dark"] .welcome-title {
 
 /* ===== تحديث: قص اللوغو ليظهر الشعار الدائري فقط بدون النص أسفله ===== */
 .logo-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  overflow: hidden;
-  display: inline-flex;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
 }
 .logo-icon img {
-  width: 340%;
-  max-width: none;
-  height: auto;
-  transform: translateY(-8%);
-  border-radius: 0;
+  position: absolute;
+  width: 160px !important;
+  max-width: none !important;
+  height: auto !important;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 0 !important;
 }
