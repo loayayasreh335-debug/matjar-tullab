@@ -1093,3 +1093,16 @@ html[data-theme="dark"] .welcome-title {
   transform: translateX(-50%);
   border-radius: 0 !important;
 }
+
+/* ===== النجمة فوق كلمة سوقنا بالهيدر ===== */
+.logo-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.logo-star {
+  width: 13px;
+  height: auto;
+  margin-bottom: 2px;
+}
