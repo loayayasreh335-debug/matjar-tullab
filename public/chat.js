@@ -72,6 +72,8 @@ function closeChatPanel() {
 
 async function openChatList() {
   if (!requireLogin('لازم تسجل دخول لتشوف محادثاتك')) return;
+  const fab = document.getElementById('chatFab');
+  if (fab) fab.classList.remove('has-unread');
 
   document.getElementById('chatPanel').classList.add('active');
   document.getElementById('chatListView').style.display = 'block';
