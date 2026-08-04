@@ -60,6 +60,8 @@ function initChatWidget() {
 
   initChatSocket();
   document.getElementById('chatFab').addEventListener('click', openChatList);
+  const navChatBtn = document.getElementById('navChatBtn');
+  if (navChatBtn) navChatBtn.addEventListener('click', openChatList);
   document.getElementById('chatCloseBtn').addEventListener('click', closeChatPanel);
   document.getElementById('chatBackBtn').addEventListener('click', openChatList);
   document.getElementById('chatSendForm').addEventListener('submit', sendChatMessage);
