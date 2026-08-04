@@ -6,7 +6,7 @@ const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 
 module.exports = function registerAuthRoutes(app, deps) {
-  const { db, crypto } = deps;
+  const { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload } = deps;
 
   // نتحقق إن كل متغيرات Firebase موجودة قبل أي محاولة تهيئة
   // لو ناقصة، نتخطى التهيئة بأمان بدل ما نوقع السيرفر بالكامل
@@ -126,8 +126,60 @@ module.exports = function registerAuthRoutes(app, deps) {
       uid: req.user.uid,
       name: req.user.name,
       email: req.user.email,
-      picture: req.user.picture
+      picture: req.user.picture,
+      defaultWhatsapp: req.user.defaultWhatsapp || ''
     });
+  });
+
+  // ---------- إعلاناتي (كل الإعلانات المرتبطة بحسابي) ----------
+  app.get('/api/auth/my-items', requireUserAuth, async (req, res) => {
+    try {
+      const items = await db.collection('items').find({ ownerUid: req.user.uid }).sort({ createdAt: -1 }).toArray();
+      res.json(items.map(({ ownerToken, imagePublicIds, _id, ...publicItem }) => publicItem));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'تعذر جلب إعلاناتك' });
+    }
+  });
+
+  // ---------- تحديث بيانات الحساب (اسم، رقم واتساب افتراضي) ----------
+  app.patch('/api/auth/profile', requireUserAuth, async (req, res) => {
+    try {
+      const { name, defaultWhatsapp } = req.body;
+      const update = {};
+      if (typeof name === 'string' && name.trim()) {
+        update.name = name.trim().slice(0, 50);
+      }
+      if (typeof defaultWhatsapp === 'string') {
+        update.defaultWhatsapp = defaultWhatsapp.trim().replace(/[^\d+]/g, '');
+      }
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ error: 'لا يوجد شيء لتحديثه' });
+      }
+      await db.collection('users').updateOne({ uid: req.user.uid }, { $set: update });
+      const user = await db.collection('users').findOne({ uid: req.user.uid });
+      res.json({ uid: user.uid, name: user.name, email: user.email, picture: user.picture, defaultWhatsapp: user.defaultWhatsapp || '' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'تعذر تحديث البيانات' });
+    }
+  });
+
+  // ---------- تحديث صورة الحساب ----------
+  app.post('/api/auth/profile/picture', requireUserAuth, upload.single('picture'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'لم يتم إرفاق صورة' });
+      const uploaded = await uploadImageToCloudinary(req.file.buffer);
+      const oldUser = await db.collection('users').findOne({ uid: req.user.uid });
+      await db.collection('users').updateOne({ uid: req.user.uid }, { $set: { picture: uploaded.url, picturePublicId: uploaded.publicId } });
+      if (oldUser && oldUser.picturePublicId) {
+        await deleteImagesFromCloudinary([oldUser.picturePublicId]);
+      }
+      res.json({ picture: uploaded.url });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'تعذر رفع الصورة' });
+    }
   });
 
   app.post('/api/auth/logout', async (req, res) => {

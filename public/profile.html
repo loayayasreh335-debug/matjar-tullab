@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حسابي | سوقنا</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .profile-wrap { max-width: 480px; margin: 0 auto; padding: 16px; }
+  .profile-header-card { display: flex; flex-direction: column; align-items: center; background: var(--card-bg, #1b1f2a); border-radius: 16px; padding: 24px 16px; margin-bottom: 20px; }
+  .profile-avatar-wrap { position: relative; width: 96px; height: 96px; margin-bottom: 12px; }
+  .profile-avatar-wrap img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); }
+  .profile-avatar-edit { position: absolute; bottom: 0; left: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; border: 2px solid #fff; }
+  .profile-field { width: 100%; margin-bottom: 14px; }
+  .profile-field label { display: block; font-size: 13px; color: #9aa0ab; margin-bottom: 6px; }
+  .profile-field input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #333a47; background: #12151c; color: #fff; font-size: 15px; box-sizing: border-box; }
+  .profile-save-btn { width: 100%; margin-top: 6px; }
+  .profile-section-title { font-size: 16px; font-weight: 700; margin: 20px 0 10px; }
+  .my-items-list { display: flex; flex-direction: column; gap: 10px; }
+  .my-item-row { display: flex; align-items: center; gap: 10px; background: var(--card-bg, #1b1f2a); border-radius: 12px; padding: 10px; text-decoration: none; color: inherit; }
+  .my-item-row img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .my-item-row .info { flex: 1; min-width: 0; }
+  .my-item-row .info .name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .my-item-row .info .meta { font-size: 12px; color: #9aa0ab; margin-top: 3px; }
+  .profile-back { display: inline-block; margin-bottom: 14px; color: var(--primary); text-decoration: none; font-weight: 600; }
+  .profile-empty { text-align: center; color: #9aa0ab; padding: 30px 10px; }
+  .profile-logout-btn { width: 100%; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <div class="profile-wrap">
+    <a href="/" class="profile-back">→ الرجوع للرئيسية</a>
+    <div id="profileNotLoggedIn" style="display:none; text-align:center; padding: 40px 10px;">
+      <p style="margin-bottom:16px;">لازم تسجل دخول عشان تشوف حسابك</p>
+      <button id="profileLoginBtn" class="btn btn-primary">🔑 تسجيل الدخول</button>
+    </div>
+    <div id="profileContent" style="display:none;">
+      <div class="profile-header-card">
+        <div class="profile-avatar-wrap">
+          <img id="profileAvatarImg" src="/logo.png" alt="صورتي">
+          <div class="profile-avatar-edit" id="profileAvatarEditBtn">📷</div>
+          <input type="file" id="profilePictureInput" accept="image/*" style="display:none;">
+        </div>
+        <div class="profile-field">
+          <label>الاسم</label>
+          <input type="text" id="profileNameInput" maxlength="50">
+        </div>
+        <div class="profile-field">
+          <label>رقم واتساب افتراضي (يُستخدم تلقائياً عند نشر إعلان)</label>
+          <input type="tel" id="profileWhatsappInput" placeholder="9627xxxxxxxx">
+        </div>
+        <button id="profileSaveBtn" class="btn btn-primary profile-save-btn">💾 حفظ التعديلات</button>
+      </div>
+      <div class="profile-section-title">📋 إعلاناتي</div>
+      <div id="myItemsList" class="my-items-list">
+        <div class="profile-empty">جاري التحميل...</div>
+      </div>
+      <button id="profileLogoutBtn" class="btn btn-ghost profile-logout-btn">🚪 تسجيل الخروج</button>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    function profileHeaders(json) {
+      const h = { 'x-user-token': getSessionToken() };
+      if (json) h['Content-Type'] = 'application/json';
+      return h;
+    }
+    async function initProfilePage() {
+      if (!isLoggedIn()) {
+        document.getElementById('profileNotLoggedIn').style.display = 'block';
+        document.getElementById('profileLoginBtn').addEventListener('click', () => loginWithGoogle());
+        return;
+      }
+      document.getElementById('profileContent').style.display = 'block';
+      try {
+        const res = await fetch('/api/auth/me', { headers: profileHeaders() });
+        if (!res.ok) throw new Error('فشل جلب البيانات');
+        const me = await res.json();
+        document.getElementById('profileAvatarImg').src = me.picture || '/logo.png';
+        document.getElementById('profileNameInput').value = me.name || '';
+        document.getElementById('profileWhatsappInput').value = me.defaultWhatsapp || '';
+      } catch (err) {
+        alert('تعذر جلب بيانات حسابك');
+      }
+      loadMyItems();
+    }
+    async function loadMyItems() {
+      const listEl = document.getElementById('myItemsList');
+      try {
+        const res = await fetch('/api/auth/my-items', { headers: profileHeaders() });
+        const items = await res.json();
+        if (!res.ok) throw new Error(items.error || 'خطأ');
+        if (!items.length) {
+          listEl.innerHTML = '<div class="profile-empty">ما نشرت أي إعلان بعد</div>';
+          return;
+        }
+        listEl.innerHTML = items.map(item => `
+          <a class="my-item-row" href="/?item=${encodeURIComponent(item.id)}">
+            <img src="${(item.imageUrls && item.imageUrls[0]) || '/logo.png'}" alt="">
+            <div class="info">
+              <div class="name">${escapeProfileHtml(item.name)}</div>
+              <div class="meta">${item.isSwapped ? '✅ تم البيع/المقايضة' : (item.adType === 'sell' ? (item.price ? item.price + ' د.أ' : '') : 'مقايضة')}</div>
+            </div>
+          </a>
+        `).join('');
+      } catch (err) {
+        listEl.innerHTML = '<div class="profile-empty">تعذر تحميل إعلاناتك</div>';
+      }
+    }
+    function escapeProfileHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+    document.getElementById('profileSaveBtn').addEventListener('click', async () => {
+      const name = document.getElementById('profileNameInput').value.trim();
+      const defaultWhatsapp = document.getElementById('profileWhatsappInput').value.trim();
+      if (!name) { alert('الاسم ما ينفع يكون فاضي'); return; }
+      try {
+        const res = await fetch('/api/auth/profile', {
+          method: 'PATCH',
+          headers: profileHeaders(true),
+          body: JSON.stringify({ name, defaultWhatsapp })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشل الحفظ');
+        const user = getCurrentUser();
+        user.name = data.name;
+        localStorage.setItem('sooqna_user', JSON.stringify(user));
+        alert('✅ تم حفظ التعديلات');
+      } catch (err) {
+        alert(err.message || 'حدث خطأ أثناء الحفظ');
+      }
+    });
+    document.getElementById('profileAvatarEditBtn').addEventListener('click', () => {
+      document.getElementById('profilePictureInput').click();
+    });
+    document.getElementById('profilePictureInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('picture', file);
+      try {
+        const res = await fetch('/api/auth/profile/picture', {
+          method: 'POST',
+          headers: { 'x-user-token': getSessionToken() },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشل رفع الصورة');
+        document.getElementById('profileAvatarImg').src = data.picture;
+        const user = getCurrentUser();
+        user.picture = data.picture;
+        localStorage.setItem('sooqna_user', JSON.stringify(user));
+        alert('✅ تم تحديث الصورة');
+      } catch (err) {
+        alert(err.message || 'حدث خطأ أثناء رفع الصورة');
+      }
+    });
+    document.getElementById('profileLogoutBtn').addEventListener('click', () => {
+      if (confirm('بدك تسجل خروج؟')) {
+        logout();
+        window.location.href = '/';
+      }
+    });
+    document.addEventListener('DOMContentLoaded', initProfilePage);
+  </script>
+</body>
+</html>
