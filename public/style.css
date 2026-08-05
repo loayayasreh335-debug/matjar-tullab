@@ -165,21 +165,33 @@ html[data-theme="dark"] .logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.navbar-row::-webkit-scrollbar {
+  display: none;
 }
 
 .navbar-row .btn,
-.navbar-row .btn-icon {
-  padding: 6px 10px;
-  font-size: 12px;
+.navbar-row .btn-icon,
+.navbar-row .auth-user-chip {
+  padding: 5px 8px;
+  font-size: 11px;
   border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .navbar-row .btn-icon {
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+  padding: 0;
 }
 
 /* ---------- الأزرار ---------- */
