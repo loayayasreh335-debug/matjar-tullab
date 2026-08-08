@@ -1,0 +1,78 @@
+/* public/my-store.css */
+body { margin: 0; }
+#myStoreRoot {
+  direction: rtl;
+  background: #FAF6EC;
+  min-height: 100vh;
+  font-family: 'Cairo', 'Tajawal', sans-serif;
+}
+
+.ms-center { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+
+.ms-card {
+  background: #fff;
+  border: 1px solid #E7DCC0;
+  border-radius: 16px;
+  padding: 20px;
+}
+.ms-login-card { text-align: center; max-width: 340px; }
+.ms-login-card h1 { color: #0B1E3D; font-size: 18px; margin: 0 0 8px; }
+.ms-login-card p { color: #5A5A5A; font-size: 13px; margin: 0 0 18px; }
+
+.btn { border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+.btn-primary { background: #0B1E3D; color: #F8F4EA; width: 100%; }
+.btn-ghost { background: #F0E9D6; color: #0B1E3D; }
+.btn-sm { font-size: 12px; padding: 6px 12px; }
+
+.ms-header {
+  background: #0B1E3D;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ms-user-chip { display: flex; align-items: center; gap: 8px; color: #F8F4EA; font-size: 13px; }
+.ms-user-chip img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+
+.ms-content { padding: 18px; max-width: 600px; margin: 0 auto; }
+.ms-loading, .ms-empty { text-align: center; color: #8A8168; padding: 16px; }
+.ms-error { color: #C0392B; font-size: 13px; padding: 8px 0; }
+
+.ms-section-title { font-size: 15px; font-weight: 700; color: #0B1E3D; margin: 0 0 12px; }
+
+.ms-store-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.ms-store-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #E7DCC0;
+  border-radius: 14px;
+  padding: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.ms-store-logo {
+  width: 46px; height: 46px; border-radius: 12px;
+  background: #0B1E3D; color: #C9A227; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+}
+.ms-store-logo img { width: 100%; height: 100%; object-fit: cover; }
+.ms-store-info { flex: 1; min-width: 0; }
+.ms-store-info h3 { font-size: 14px; margin: 0; color: #1A1A1A; }
+.ms-store-info p { font-size: 12px; color: #8A8168; margin: 2px 0 0; }
+.ms-store-arrow { color: #C9A227; font-size: 20px; }
+
+.ms-create-card { }
+.ms-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #E7DCC0;
+  background: #FAF6EC;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 10px;
+  font-family: inherit;
+}
+.ms-hint { font-size: 11px; color: #8A8168; margin: 10px 0 0; text-align: center; }
