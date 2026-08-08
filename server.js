@@ -516,6 +516,7 @@ app.get('/university/:name', (req, res) => {
 connectDB()
   .then(() => {
     require('./routes-auth')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload });
+    require('./routes-store.js')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload });
     require('./routes-chat')(app, { db, io, emitToUser });
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
     require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
