@@ -1,0 +1,31 @@
+<!-- public/admin-stores.html -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة اشتراكات المحلات - سوقنا</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { direction: rtl; font-family: 'Cairo', 'Tajawal', sans-serif; background: #FAF6EC; margin: 0; padding: 20px; }
+    h1 { color: #0B1E3D; font-size: 20px; }
+    .admin-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; }
+    .admin-table th, .admin-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #E7DCC0; font-size: 13px; }
+    .admin-table th { background: #0B1E3D; color: #C9A227; }
+    .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn { border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+    .btn-primary { background: #0B1E3D; color: #F8F4EA; }
+    .btn-ghost { background: #F0E9D6; color: #0B1E3D; }
+  </style>
+</head>
+<body>
+  <h1>إدارة اشتراكات المحلات</h1>
+  <div id="adminStoresRoot"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/admin-stores.js"></script>
+</body>
+</html>
+

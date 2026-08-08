@@ -1,0 +1,89 @@
+/* public/official-stores.css */
+#officialStoresRoot {
+  direction: rtl;
+  background: #FAF6EC;
+  min-height: 100vh;
+  padding-bottom: 40px;
+  font-family: 'Cairo', 'Tajawal', sans-serif;
+}
+
+.ofs-hero {
+  background: linear-gradient(135deg, #0B1E3D, #14335C);
+  padding: 28px 20px;
+  text-align: center;
+  border-radius: 0 0 20px 20px;
+}
+.ofs-hero h1 { color: #C9A227; font-size: 20px; margin: 0 0 6px; }
+.ofs-hero p { color: #D8DEE8; font-size: 13px; margin: 0; }
+
+.ofs-filter-bar {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.ofs-input {
+  flex: 1;
+  border: 1px solid #E7DCC0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.ofs-loading, .ofs-empty { text-align: center; padding: 40px 16px; color: #8A8168; grid-column: 1 / -1; }
+
+.ofs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ofs-card {
+  display: block;
+  background: #fff;
+  border: 1px solid #E7DCC0;
+  border-radius: 16px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+.ofs-card-cover {
+  height: 70px;
+  background-color: #0B1E3D;
+  background-image: linear-gradient(135deg, #0B1E3D, #14335C);
+  background-size: cover;
+  background-position: center;
+}
+.ofs-card-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin-top: -24px;
+}
+.ofs-card-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #0B1E3D;
+  border: 3px solid #fff;
+  color: #C9A227;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ofs-card-logo img { width: 100%; height: 100%; object-fit: cover; }
+.ofs-card-info { min-width: 0; padding-top: 20px; }
+.ofs-card-name-row { display: flex; align-items: center; gap: 4px; }
+.ofs-card-name-row h3 { font-size: 14px; margin: 0; color: #1A1A1A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofs-verified-dot { font-size: 11px; }
+.ofs-card-info p { font-size: 12px; color: #8A8168; margin: 2px 0 0; }
+
