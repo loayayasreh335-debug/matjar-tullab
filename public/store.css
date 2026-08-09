@@ -78,17 +78,6 @@
 
 .store-manage-btn { margin-right: auto; }
 
-.store-sub-banner {
-  margin: 16px 20px 0;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  max-width: 700px;
-}
-.store-sub-banner--warn { background: #FFF4D6; color: #7A5B00; border: 1px solid #E7C948; }
-.store-sub-banner--danger { background: #FDE8E6; color: #A32C24; border: 1px solid #F0A79E; }
-
 .store-description {
   padding: 16px 20px 0;
   color: #3A3A3A;
@@ -161,4 +150,3 @@
 .store-product-actions { margin-top: 8px; }
 
 .btn-sm { font-size: 12px; padding: 6px 10px; }
-

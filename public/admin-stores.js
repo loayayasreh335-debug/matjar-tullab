@@ -106,4 +106,3 @@ async function unsuspendStore(slug) {
 }
 
 document.addEventListener('DOMContentLoaded', () => loadAdminStores());
-
