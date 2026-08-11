@@ -1140,3 +1140,13 @@ html[data-theme="dark"] .welcome-title {
 .btn-chat:hover {
   background: var(--border);
 }
+
+.chat-unread-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #E0342A;
+  margin-right: 4px;
+  vertical-align: middle;
+}

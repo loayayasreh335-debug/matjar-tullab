@@ -37,7 +37,7 @@
           <button id="themeToggleBtn" class="btn-icon" title="تبديل المظهر">🌙</button>
         </div>
         <div class="navbar-row">
-          <button id="navChatBtn" class="btn btn-ghost">💬 المحادثات</button>
+          <button id="navChatBtn" class="btn btn-ghost">💬 المحادثات<span id="chatUnreadDot" class="chat-unread-dot" style="display:none"></span></button>
           <a href="/profile.html" class="btn btn-ghost">👤 حسابي</a>
           <div id="authWidget"></div>
         </div>
@@ -259,7 +259,6 @@
   </div>
 
   <link rel="stylesheet" href="chat.css">
-  <div id="chatRoot"></div>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="auth.js"></script>

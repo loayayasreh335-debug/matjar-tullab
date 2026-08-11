@@ -3,7 +3,7 @@
 // يعتمد بالكامل على تسجيل الدخول من routes-auth.js - لا يعمل بدون حساب
 
 module.exports = function registerChatRoutes(app, deps) {
-  const { db, emitToUser } = deps;
+  const { db } = deps;
   const requireUserAuth = deps.requireUserAuth || app.locals.requireUserAuth;
 
   db.collection('conversations').createIndex({ participants: 1 }).catch(console.error);
@@ -125,16 +125,6 @@ module.exports = function registerChatRoutes(app, deps) {
         createdAt: now
       });
       await db.collection('conversations').updateOne({ id: req.params.id }, { $set: { lastMessageAt: now } });
-
-      const otherUid = conversation.participants.find(uid => uid !== req.user.uid);
-      if (emitToUser) {
-        emitToUser(otherUid, 'newMessage', {
-          conversationId: req.params.id,
-          senderUid: req.user.uid,
-          text: cleanText,
-          createdAt: now
-        });
-      }
 
       res.status(201).json({ success: true });
     } catch (err) {

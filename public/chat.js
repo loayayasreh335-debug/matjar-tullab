@@ -3,33 +3,6 @@
 
 let chatPollInterval = null;
 let currentConversationId = null;
-let chatSocket = null;
-
-function initChatSocket() {
-  const me = getCurrentUser();
-  if (!me || !me.uid) return;
-  if (chatSocket) return;
-  chatSocket = io();
-  chatSocket.on('connect', () => {
-    chatSocket.emit('register', me.uid);
-  });
-  chatSocket.on('newMessage', (msg) => {
-    if (msg.conversationId === currentConversationId) {
-      const me2 = getCurrentUser();
-      const box = document.getElementById('chatMessages');
-      if (box) {
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble ' + (msg.senderUid === me2.uid ? 'mine' : 'theirs');
-        bubble.textContent = msg.text;
-        box.appendChild(bubble);
-        box.scrollTop = box.scrollHeight;
-      }
-    } else {
-      const fab = document.getElementById('chatFab');
-      if (fab) fab.classList.add('has-unread');
-    }
-  });
-}
 
 function chatHeaders() {
   return { 'Content-Type': 'application/json', 'x-user-token': getSessionToken() };
@@ -58,10 +31,7 @@ function initChatWidget() {
     </div>
   `;
 
-  initChatSocket();
   document.getElementById('chatFab').addEventListener('click', openChatList);
-  const navChatBtn = document.getElementById('navChatBtn');
-  if (navChatBtn) navChatBtn.addEventListener('click', openChatList);
   document.getElementById('chatCloseBtn').addEventListener('click', closeChatPanel);
   document.getElementById('chatBackBtn').addEventListener('click', openChatList);
   document.getElementById('chatSendForm').addEventListener('submit', sendChatMessage);
@@ -74,8 +44,6 @@ function closeChatPanel() {
 
 async function openChatList() {
   if (!requireLogin('لازم تسجل دخول لتشوف محادثاتك')) return;
-  const fab = document.getElementById('chatFab');
-  if (fab) fab.classList.remove('has-unread');
 
   document.getElementById('chatPanel').classList.add('active');
   document.getElementById('chatListView').style.display = 'block';

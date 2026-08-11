@@ -29,7 +29,6 @@
 }
 
 .chat-fab {
-  display: none;
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -43,17 +42,6 @@
   font-size: 24px;
   cursor: pointer;
   box-shadow: var(--shadow-hover);
-}
-.chat-fab.has-unread::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  background: #ff3b30;
-  border-radius: 50%;
-  border: 2px solid #fff;
 }
 
 .chat-panel {
