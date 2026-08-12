@@ -1,3 +1,17 @@
+const THEME_KEY = 'matjarTullab_theme';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('chatThemeToggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (preferDark ? 'dark' : 'light'));
+}
+
 // public/chat-page.js
 // صفحة الشات الكاملة (بديل الفقاعة العائمة القديمة)
 // يدعم فتح محادثة مباشرة عبر /chat.html?conv=CONVERSATION_ID
@@ -27,8 +41,11 @@ function renderShell() {
     <div class="chat-page">
       <div class="chat-list-panel" id="chatListPanel">
         <div class="chat-page-header">
-          <a href="/" class="chat-back-home">←</a>
+          <a href="/" class="chat-logo-link">
+            <img src="/logo-icon.png" alt="سوقنا" class="chat-logo-icon">
+          </a>
           <h1>المحادثات</h1>
+          <button id="chatThemeToggle" class="chat-back-btn chat-theme-btn" title="تبديل الوضع الليلي">🌙</button>
         </div>
         <div id="chatListView" class="chat-list"></div>
       </div>
@@ -49,6 +66,12 @@ function renderShell() {
 
   document.getElementById('chatBackToList').addEventListener('click', showListOnMobile);
   document.getElementById('chatSendForm').addEventListener('submit', sendMessage);
+  document.getElementById('chatThemeToggle').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem(THEME_KEY, next);
+  });
 }
 
 function showListOnMobile() {
@@ -172,6 +195,8 @@ async function sendMessage(e) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
+
   if (!isLoggedIn()) {
     document.getElementById('chatPageRoot').innerHTML = `
       <div class="chat-login-prompt">

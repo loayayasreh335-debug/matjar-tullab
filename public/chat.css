@@ -32,6 +32,24 @@ body {
   margin: 0;
 }
 
+.chat-logo-link {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.chat-logo-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.chat-theme-btn {
+  margin-right: auto;
+  display: flex !important;
+}
+
 .chat-back-home,
 .chat-back-btn {
   display: none;
