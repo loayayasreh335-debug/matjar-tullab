@@ -48,22 +48,6 @@ module.exports = function registerLostFoundRoutes(app, deps) {
     lfDeviceLimitTracker.set(deviceId, timestamps);
   }
 
-  // ---------- تتبّع محاولات سؤال التحقق (منع التخمين العشوائي) ----------
-  const claimAttemptsTracker = new Map(); // key: itemId_deviceId -> [timestamps]
-  function isClaimRateLimited(itemId, deviceId) {
-    const key = `${itemId}_${deviceId || 'anon'}`;
-    const now = Date.now();
-    const oneHourAgo = now - 60 * 60 * 1000;
-    const timestamps = (claimAttemptsTracker.get(key) || []).filter(t => t > oneHourAgo);
-    claimAttemptsTracker.set(key, timestamps);
-    return timestamps.length >= LF_MAX_CLAIM_ATTEMPTS;
-  }
-  function recordClaimAttempt(itemId, deviceId) {
-    const key = `${itemId}_${deviceId || 'anon'}`;
-    const timestamps = claimAttemptsTracker.get(key) || [];
-    timestamps.push(Date.now());
-    claimAttemptsTracker.set(key, timestamps);
-  }
 
   // ---------- تجهيز العنصر للعرض العام (إخفاء الحقول الحساسة) ----------
   function toPublicLostFound(item) {
