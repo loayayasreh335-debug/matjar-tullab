@@ -65,6 +65,13 @@ module.exports = function registerChatRoutes(app, deps) {
         .sort({ lastMessageAt: -1 })
         .toArray();
 
+      const itemIds = conversations.filter(c => c.itemType === 'item').map(c => c.itemId);
+      const itemsById = {};
+      if (itemIds.length) {
+        const items = await db.collection('items').find({ id: { $in: itemIds } }).project({ id: 1, adType: 1 }).toArray();
+        items.forEach(it => { itemsById[it.id] = it.adType; });
+      }
+
       const result = conversations.map(c => {
         const otherUid = c.participants.find(uid => uid !== req.user.uid);
         const otherInfo = (c.participantInfo && c.participantInfo[otherUid]) || {};
@@ -73,6 +80,7 @@ module.exports = function registerChatRoutes(app, deps) {
           itemType: c.itemType,
           itemId: c.itemId,
           itemName: c.itemName,
+          adType: c.itemType === 'item' ? (itemsById[c.itemId] || null) : null,
           otherUser: { uid: otherUid, name: otherInfo.name || 'مستخدم', picture: otherInfo.picture || '' }
         };
       });
