@@ -194,6 +194,36 @@ html[data-theme="dark"] .logo {
   padding: 0;
 }
 
+/* هوية المستخدم بالنافبار (كانت بالغلط جوا chat.css القديم) */
+.auth-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 10px 4px 4px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+}
+
+.auth-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.auth-user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- الأزرار ---------- */
 .btn {
   border: none;
