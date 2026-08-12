@@ -521,6 +521,7 @@ connectDB()
     require('./routes-auctions')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, ADMIN_PASSWORD, issueAdminToken, requireAdminToken });
     require('./routes-escrow')(app, { db, crypto, ADMIN_PASSWORD, upload, uploadImageToCloudinary, requireAdminToken });
     require('./routes-lostfound')(app, { db, crypto, uploadImageToCloudinary, deleteImagesFromCloudinary, upload, requireAdminToken, JORDAN_LOCATIONS, requireUserAuth: app.locals.requireUserAuth });
+    require('./routes-favorites')(app, { db, requireUserAuth: app.locals.requireUserAuth });
 
     // معالجة أخطاء Multer
     app.use((err, req, res, next) => {
