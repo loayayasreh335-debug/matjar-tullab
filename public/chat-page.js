@@ -52,7 +52,7 @@ function renderShell() {
 }
 
 function showListOnMobile() {
-  document.getElementById('chatPageRoot').classList.remove('convo-active');
+  document.querySelector('.chat-page').classList.remove('convo-active');
 }
 
 function initSocket() {
@@ -106,7 +106,7 @@ async function loadConversationList() {
 async function openConversation(id, name) {
   currentConvId = id;
   window.history.replaceState({}, '', `/chat.html?conv=${id}`);
-  document.getElementById('chatPageRoot').classList.add('convo-active');
+  document.querySelector('.chat-page').classList.add('convo-active');
   document.getElementById('chatConvoTitle').textContent = name || 'محادثة';
 
   document.querySelectorAll('.chat-list-item').forEach(el => {
