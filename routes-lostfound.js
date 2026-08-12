@@ -142,9 +142,6 @@ module.exports = function registerLostFoundRoutes(app, deps) {
       if (!JORDAN_LOCATIONS[governorate] || !JORDAN_LOCATIONS[governorate].includes(area)) {
         return res.status(400).json({ error: 'المحافظة أو المنطقة المختارة غير صحيحة' });
       }
-      if (type === 'found' && (!verificationAnswer || !verificationAnswer.trim())) {
-        return res.status(400).json({ error: 'يرجى إدخال علامة فارقة للتأكد من صاحب الغرض الحقيقي' });
-      }
 
       const uploaded = await Promise.all(
         (req.files || []).map(f => uploadImageToCloudinary(f.buffer))
@@ -162,7 +159,6 @@ module.exports = function registerLostFoundRoutes(app, deps) {
         governorate: governorate.trim(),
         area: area.trim(),
         whatsapp: cleanedWhatsapp,
-        verificationAnswer: type === 'found' ? verificationAnswer.trim().toLowerCase() : '',
         imageUrls: uploaded.map(u => u.url),
         imagePublicIds: uploaded.map(u => u.publicId),
         createdAt: Date.now(),
