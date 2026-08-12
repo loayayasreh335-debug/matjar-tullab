@@ -60,6 +60,7 @@ function initChatNav() {
   const navChatBtn = document.getElementById('navChatBtn');
   if (navChatBtn) {
     navChatBtn.addEventListener('click', () => {
+      alert('✅ وصلت الكبسة للزر - عم أحوّلك هلق');
       window.location.href = '/chat.html';
     });
   }
