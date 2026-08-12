@@ -176,33 +176,6 @@ module.exports = function registerLostFoundRoutes(app, deps) {
     }
   });
 
-  // سؤال التحقق - يحاول شخص إثبات إنه صاحب الغرض الموجود
-  app.post('/api/lostfound/:id/claim', async (req, res) => {
-    try {
-      const deviceId = req.headers['x-device-id'];
-      const { answer } = req.body;
-
-      if (isClaimRateLimited(req.params.id, deviceId)) {
-        return res.status(429).json({ error: 'محاولات كثيرة، حاول مرة أخرى بعد ساعة.' });
-      }
-
-      const item = await db.collection('lostfound').findOne({ id: req.params.id });
-      if (!item) return res.status(404).json({ error: 'المنشور غير موجود' });
-      if (item.type !== 'found') return res.status(400).json({ error: 'هذا المنشور لا يحتاج سؤال تحقق' });
-
-      recordClaimAttempt(req.params.id, deviceId);
-
-      const cleanAnswer = (answer || '').trim().toLowerCase();
-      if (!cleanAnswer || cleanAnswer !== item.verificationAnswer) {
-        return res.status(403).json({ error: 'الإجابة غير صحيحة، حاول مرة أخرى' });
-      }
-
-      res.json({ success: true, whatsapp: item.whatsapp, name: item.name });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'تعذر التحقق من الإجابة' });
-    }
-  });
 
   // تعليم منشور كـ "تم الإرجاع لأصحابه"
   app.patch('/api/lostfound/:id/resolve', async (req, res) => {
