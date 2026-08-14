@@ -6,14 +6,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>المتجر - سوقنا</title>
+  <link rel="icon" type="image/png" href="/logo-icon.png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/store.css">
 </head>
 <body>
 
-  <!-- استبدل هذا بالهيدر الموحّد تبع موقعكم (فيه authWidget) -->
-  <header class="site-header">
-    <div id="authWidget"></div>
+  <!-- الهيدر -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon"><img src="/logo-icon.png" alt="سوقنا"></span>
+        <span class="logo-text-wrap">
+          <img src="/logo-star.png" class="logo-star" alt="">
+          <span>سوقنا</span>
+        </span>
+      </a>
+      <div class="navbar-actions">
+        <div class="navbar-row">
+          <a href="/" class="btn btn-ghost">🏠 الرئيسية</a>
+          <a href="/official-stores.html" class="btn btn-ghost">🏬 المتاجر الرسمية</a>
+          <a href="/lostfound.html" class="btn btn-ghost">🔍 المفقودات</a>
+        </div>
+        <div class="navbar-row">
+          <button id="navChatBtn" class="btn btn-ghost">💬 المحادثات<span id="chatUnreadDot" class="chat-unread-dot" style="display:none"></span></button>
+          <a href="/profile.html" class="btn btn-ghost">👤 حسابي</a>
+          <div id="authWidget"></div>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div id="storeRoot"></div>
@@ -21,10 +42,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="/auth.js"></script>
+  <script src="/chat.js"></script>
   <script src="/store.js"></script>
   <script>
     if (typeof renderAuthUI === 'function') renderAuthUI();
   </script>
 </body>
 </html>
-
