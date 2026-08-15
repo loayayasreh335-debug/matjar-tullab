@@ -372,9 +372,9 @@ module.exports = function registerStoreRoutes(app, deps) {
     async (req, res) => {
       try {
         if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال صورة' });
-        const url = await uploadImageToCloudinary(req.file.buffer);
-        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { logoUrl: url } });
-        res.json({ success: true, logoUrl: url });
+        const uploaded = await uploadImageToCloudinary(req.file.buffer);
+        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { logoUrl: uploaded.url } });
+        res.json({ success: true, logoUrl: uploaded.url });
       } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'تعذر رفع الشعار' });
@@ -391,9 +391,9 @@ module.exports = function registerStoreRoutes(app, deps) {
     async (req, res) => {
       try {
         if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال صورة' });
-        const url = await uploadImageToCloudinary(req.file.buffer);
-        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { coverImageUrl: url } });
-        res.json({ success: true, coverImageUrl: url });
+        const uploaded = await uploadImageToCloudinary(req.file.buffer);
+        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { coverImageUrl: uploaded.url } });
+        res.json({ success: true, coverImageUrl: uploaded.url });
       } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'تعذر رفع صورة الغلاف' });
@@ -851,7 +851,7 @@ module.exports = function registerStoreRoutes(app, deps) {
       }
 
       const uploadedImages = await Promise.all(
-        (req.files || []).map((f) => uploadImageToCloudinary(f.buffer))
+        (req.files || []).map(async (f) => (await uploadImageToCloudinary(f.buffer)).url)
       );
 
       const product = {
@@ -893,7 +893,9 @@ module.exports = function registerStoreRoutes(app, deps) {
 
         // إذا انبعتت صور جديدة، بتستبدل صور المنتج القديمة بالكامل
         if (req.files && req.files.length > 0) {
-          updates.images = await Promise.all(req.files.map((f) => uploadImageToCloudinary(f.buffer)));
+          updates.images = await Promise.all(
+            req.files.map(async (f) => (await uploadImageToCloudinary(f.buffer)).url)
+          );
         }
 
         await db.collection('store_products').updateOne({ _id: req.product._id }, { $set: updates });
