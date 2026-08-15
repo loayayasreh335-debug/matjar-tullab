@@ -533,12 +533,15 @@ module.exports = function registerStoreRoutes(app, deps) {
     requirePlatformSuperAdmin,
     async (req, res) => {
       try {
-        await db
+        const result = await db
           .collection('stores')
           .updateOne(
             { slug: req.params.slug },
             { $set: { approvalStatus: 'approved', approvalReason: '' } }
           );
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: 'المحل غير موجود' });
+        }
         res.json({ success: true });
       } catch (err) {
         console.error(err);
@@ -555,12 +558,15 @@ module.exports = function registerStoreRoutes(app, deps) {
     async (req, res) => {
       try {
         const { reason = '' } = req.body;
-        await db
+        const result = await db
           .collection('stores')
           .updateOne(
             { slug: req.params.slug },
             { $set: { approvalStatus: 'rejected', approvalReason: reason } }
           );
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: 'المحل غير موجود' });
+        }
         res.json({ success: true });
       } catch (err) {
         console.error(err);
