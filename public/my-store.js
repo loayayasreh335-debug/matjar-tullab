@@ -21,6 +21,12 @@ const STATUS_LABELS = {
   suspended: '⛔ موقوف',
 };
 
+const APPROVAL_LABELS = {
+  pending: '⏳ بانتظار موافقة الإدارة',
+  approved: '',
+  rejected: '❌ مرفوض',
+};
+
 function render() {
   const root = document.getElementById('myStoreRoot');
 
@@ -100,7 +106,8 @@ async function loadMyStores() {
                    </div>
                    <div class="ms-store-info">
                      <h3>${escapeHtml(s.name)} ${s.isVerified ? '✅' : ''}</h3>
-                     <p>${s.role === 'owner' ? 'المالك' : 'مشرف'} · ${STATUS_LABELS[s.effectiveStatus] || ''}</p>
+                     <p>${s.role === 'owner' ? 'المالك' : 'مشرف'} · ${APPROVAL_LABELS[s.approvalStatus] || STATUS_LABELS[s.effectiveStatus] || ''}</p>
+                     ${s.approvalStatus === 'rejected' && s.approvalReason ? `<p class="ms-reject-reason">السبب: ${escapeHtml(s.approvalReason)}</p>` : ''}
                    </div>
                    <span class="ms-store-arrow">‹</span>
                  </a>`
@@ -124,6 +131,10 @@ async function loadMyStores() {
           <option value="أخرى">أخرى</option>
         </select>
         <textarea id="msDesc" class="ms-input" placeholder="وصف قصير عن المحل" rows="2"></textarea>
+        <p class="ms-input-label">شعار المحل (اختياري، تقدر تضيفه بعدين)</p>
+        <input id="msLogoFile" type="file" accept="image/*" class="ms-input">
+        <p class="ms-input-label">صورة غلاف المحل (اختياري، تقدر تضيفها بعدين)</p>
+        <input id="msCoverFile" type="file" accept="image/*" class="ms-input">
         <button id="msCreateBtn" class="btn btn-primary">إنشاء المحل</button>
         <p class="ms-hint">💡 بيبلش عندك شهر تجريبي مجاني، وبعدها الاشتراك 15 د.أ شهرياً.</p>
       </div>
@@ -145,6 +156,8 @@ async function createStore() {
     .replace(/[^a-z0-9-]/g, '-');
   const category = document.getElementById('msCategory').value;
   const description = document.getElementById('msDesc').value.trim();
+  const logoFile = document.getElementById('msLogoFile').files[0];
+  const coverFile = document.getElementById('msCoverFile').files[0];
 
   if (!name || !slug) {
     msg.innerHTML = '<p class="ms-error">اسم المحل ورابطه مطلوبين</p>';
@@ -164,6 +177,21 @@ async function createStore() {
     if (!res.ok) {
       msg.innerHTML = `<p class="ms-error">${escapeHtml(data.error || 'تعذر الإنشاء')}</p>`;
       return;
+    }
+
+    // رفع الشعار والغلاف (لو انتاروا) بعد إنشاء المحل مباشرة — بدون فرض Content-Type
+    // (FormData لازم يحدد الـ boundary تلقائيًا، مش JSON)
+    const token = getSessionToken();
+    const fileHeaders = token ? { 'x-user-token': token } : {};
+    if (logoFile) {
+      const fd = new FormData();
+      fd.append('image', logoFile);
+      await fetch(`/api/stores/${slug}/logo`, { method: 'PATCH', headers: fileHeaders, body: fd }).catch(() => {});
+    }
+    if (coverFile) {
+      const fd = new FormData();
+      fd.append('image', coverFile);
+      await fetch(`/api/stores/${slug}/cover`, { method: 'PATCH', headers: fileHeaders, body: fd }).catch(() => {});
     }
 
     window.location.href = `/store.html?slug=${slug}`;

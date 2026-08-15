@@ -196,3 +196,6 @@
 .store-product-actions { margin-top: 8px; }
 
 .btn-sm { font-size: 12px; padding: 6px 10px; }
+
+.ms-current-images { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ms-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid var(--sooqna-border); display: inline-block; margin-left: 6px; }

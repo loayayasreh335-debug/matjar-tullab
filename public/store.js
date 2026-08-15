@@ -337,6 +337,16 @@ function openEditProductModal(productId) {
         <input id="epPrice" type="number" class="ms-input" value="${product.price}">
         <input id="epCategory" class="ms-input" value="${escapeHtml(product.category || '')}">
         <textarea id="epDesc" class="ms-input" rows="3">${escapeHtml(product.description || '')}</textarea>
+        ${
+          product.images && product.images[0]
+            ? `<p class="ms-input-label">الصور الحالية</p>
+               <div class="ms-current-images">
+                 ${product.images.map((u) => `<img src="${u}" class="ms-thumb">`).join('')}
+               </div>`
+            : ''
+        }
+        <p class="ms-input-label">تغيير الصور (اختياري — اختيار صور جديدة بيستبدل القديمة كلها)</p>
+        <input id="epImages" type="file" accept="image/*" multiple class="ms-input">
         <button id="epSubmit" class="btn btn-primary">حفظ التعديل</button>
       </div>
     </div>
@@ -350,13 +360,21 @@ function openEditProductModal(productId) {
     const price = Number(document.getElementById('epPrice').value);
     const category = document.getElementById('epCategory').value.trim();
     const description = document.getElementById('epDesc').value.trim();
+    const files = document.getElementById('epImages').files;
 
     msg.innerHTML = '<p class="ms-loading">جاري الحفظ...</p>';
     try {
+      const fd = new FormData();
+      fd.append('title', title);
+      fd.append('price', price);
+      fd.append('category', category);
+      fd.append('description', description);
+      for (const f of files) fd.append('images', f);
+
       const res = await fetch(`/api/stores/${STORE_SLUG}/products/${productId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
-        body: JSON.stringify({ title, price, category, description }),
+        headers: apiHeaders(), // بدون Content-Type — FormData بيحددها تلقائيًا
+        body: fd,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -389,6 +407,8 @@ function openAddProductModal() {
         <input id="apPrice" type="number" class="ms-input" placeholder="السعر (د.أ)">
         <input id="apCategory" class="ms-input" placeholder="الفئة (اختياري)">
         <textarea id="apDesc" class="ms-input" rows="3" placeholder="الوصف"></textarea>
+        <p class="ms-input-label">صور المنتج (تقدر تختار أكتر من صورة)</p>
+        <input id="apImages" type="file" accept="image/*" multiple class="ms-input">
         <button id="apSubmit" class="btn btn-primary">نشر</button>
       </div>
     </div>
@@ -402,6 +422,7 @@ function openAddProductModal() {
     const price = Number(document.getElementById('apPrice').value);
     const category = document.getElementById('apCategory').value.trim();
     const description = document.getElementById('apDesc').value.trim();
+    const files = document.getElementById('apImages').files;
 
     if (!title || !price) {
       msg.innerHTML = '<p class="ms-error">اسم المنشور والسعر مطلوبين</p>';
@@ -410,10 +431,17 @@ function openAddProductModal() {
 
     msg.innerHTML = '<p class="ms-loading">جاري النشر...</p>';
     try {
+      const fd = new FormData();
+      fd.append('title', title);
+      fd.append('price', price);
+      fd.append('category', category);
+      fd.append('description', description);
+      for (const f of files) fd.append('images', f);
+
       const res = await fetch(`/api/stores/${STORE_SLUG}/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
-        body: JSON.stringify({ title, price, category, description }),
+        headers: apiHeaders(), // بدون Content-Type — FormData بيحددها تلقائيًا
+        body: fd,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -452,6 +480,14 @@ function openEditStoreModal() {
 
         <p class="ms-input-label">رقم الهاتف</p>
         <input id="esPhone" class="ms-input" value="${escapeHtml(c.phone || '')}" placeholder="07xxxxxxxx">
+
+        <p class="ms-input-label">شعار المحل</p>
+        ${currentStore.logoUrl ? `<img src="${currentStore.logoUrl}" class="ms-thumb">` : ''}
+        <input id="esLogoFile" type="file" accept="image/*" class="ms-input">
+
+        <p class="ms-input-label">صورة الغلاف</p>
+        ${currentStore.coverImageUrl ? `<img src="${currentStore.coverImageUrl}" class="ms-thumb">` : ''}
+        <input id="esCoverFile" type="file" accept="image/*" class="ms-input">
 
         <p class="ms-input-label">العنوان (نص)</p>
         <input id="esAddress" class="ms-input" value="${escapeHtml(c.address || '')}" placeholder="عمّان، الأردن">
@@ -517,6 +553,21 @@ function openEditStoreModal() {
         msg.innerHTML = `<p class="ms-error">${escapeHtml(data.error || 'تعذر الحفظ')}</p>`;
         return;
       }
+
+      // رفع الشعار/الغلاف لو انتاروا (بدون Content-Type — FormData بتحددها تلقائيًا)
+      const logoFile = document.getElementById('esLogoFile').files[0];
+      const coverFile = document.getElementById('esCoverFile').files[0];
+      if (logoFile) {
+        const fd = new FormData();
+        fd.append('image', logoFile);
+        await fetch(`/api/stores/${STORE_SLUG}/logo`, { method: 'PATCH', headers: apiHeaders(), body: fd }).catch(() => {});
+      }
+      if (coverFile) {
+        const fd = new FormData();
+        fd.append('image', coverFile);
+        await fetch(`/api/stores/${STORE_SLUG}/cover`, { method: 'PATCH', headers: apiHeaders(), body: fd }).catch(() => {});
+      }
+
       wrapper.remove();
       loadStore();
     } catch (err) {

@@ -5,7 +5,7 @@
 const { ObjectId } = require('mongodb');
 
 module.exports = function registerStoreRoutes(app, deps) {
-  const { db } = deps;
+  const { db, uploadImageToCloudinary, upload } = deps;
   const requireUserAuth = app.locals.requireUserAuth;
   const getUidFromToken = app.locals.getUidFromToken;
 
@@ -362,6 +362,44 @@ module.exports = function registerStoreRoutes(app, deps) {
       res.status(500).json({ error: 'تعذر التحديث' });
     }
   });
+
+  // رفع/تغيير شعار المتجر — مالك أو مشرف
+  app.patch(
+    '/api/stores/:slug/logo',
+    requireUserAuth,
+    requireStoreManager,
+    upload.single('image'),
+    async (req, res) => {
+      try {
+        if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال صورة' });
+        const url = await uploadImageToCloudinary(req.file.buffer);
+        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { logoUrl: url } });
+        res.json({ success: true, logoUrl: url });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'تعذر رفع الشعار' });
+      }
+    }
+  );
+
+  // رفع/تغيير صورة غلاف المتجر — مالك أو مشرف
+  app.patch(
+    '/api/stores/:slug/cover',
+    requireUserAuth,
+    requireStoreManager,
+    upload.single('image'),
+    async (req, res) => {
+      try {
+        if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال صورة' });
+        const url = await uploadImageToCloudinary(req.file.buffer);
+        await db.collection('stores').updateOne({ _id: req.store._id }, { $set: { coverImageUrl: url } });
+        res.json({ success: true, coverImageUrl: url });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'تعذر رفع صورة الغلاف' });
+      }
+    }
+  );
 
   // تعديل التواصل والسياسات — المالك فقط
   app.patch(
@@ -804,12 +842,17 @@ module.exports = function registerStoreRoutes(app, deps) {
     requireUserAuth,
     requireStoreManager,
     requireActiveSubscription,
+    upload.array('images', 5),
     async (req, res) => {
     try {
-      const { title, description, price, discountPrice, images, category, stock } = req.body;
+      const { title, description, price, discountPrice, category, stock } = req.body;
       if (!title || price === undefined) {
         return res.status(400).json({ error: 'العنوان والسعر مطلوبان' });
       }
+
+      const uploadedImages = await Promise.all(
+        (req.files || []).map((f) => uploadImageToCloudinary(f.buffer))
+      );
 
       const product = {
         storeId: req.store._id, // ← يُشتق من الراوت (req.store)، مش من body
@@ -818,7 +861,7 @@ module.exports = function registerStoreRoutes(app, deps) {
         description: description || '',
         price: Number(price),
         discountPrice: discountPrice !== undefined ? Number(discountPrice) : null,
-        images: images || [],
+        images: uploadedImages,
         category: category || '',
         stock: stock !== undefined ? Number(stock) : 0,
         isPublished: true,
@@ -841,11 +884,18 @@ module.exports = function registerStoreRoutes(app, deps) {
     requireUserAuth,
     requireStoreManager,
     requireProductBelongsToStore,
+    upload.array('images', 5),
     async (req, res) => {
       try {
-        const allowed = ['title', 'description', 'price', 'discountPrice', 'images', 'category', 'stock', 'isPublished'];
+        const allowed = ['title', 'description', 'price', 'discountPrice', 'category', 'stock', 'isPublished'];
         const updates = { lastEditedByUid: req.user.uid };
         for (const f of allowed) if (req.body[f] !== undefined) updates[f] = req.body[f];
+
+        // إذا انبعتت صور جديدة، بتستبدل صور المنتج القديمة بالكامل
+        if (req.files && req.files.length > 0) {
+          updates.images = await Promise.all(req.files.map((f) => uploadImageToCloudinary(f.buffer)));
+        }
+
         await db.collection('store_products').updateOne({ _id: req.product._id }, { $set: updates });
         res.json({ success: true });
       } catch (err) {
