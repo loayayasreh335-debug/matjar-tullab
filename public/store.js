@@ -1,68 +1,535 @@
-// backend/models/Store.js
-// نموذج المتجر الرسمي على منصة سوقنا
-// كل الحقول الحساسة (owner, admins, isVerified) لا يجب أن تُعدَّل مباشرة
-// من أي طلب قادم من العميل — فقط عبر منطق سيرفر صريح ومحمي.
+// public/store.js
+// صفحة المتجر - يتوقع أن store.html فيه: <div id="storeRoot"></div>
+// ويحتاج auth.js محمّل قبله (يستخدم getSessionToken من auth.js)
 
-const mongoose = require("mongoose");
-const { Schema } = mongoose;
+const STORE_SLUG = new URLSearchParams(window.location.search).get('slug');
 
-const StoreAdminSchema = new Schema(
-  {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    // manager: يقدر ينشر/يعدّل/يحذف منتجات
-    // viewer: صلاحية اطّلاع فقط (مستقبلاً، غير مستخدمة بالنشر)
-    role: { type: String, enum: ["manager", "viewer"], default: "manager" },
-    // يسمح للمالك بتعطيل صلاحية مشرف مؤقتاً دون حذفه
-    isActive: { type: Boolean, default: true },
-    addedAt: { type: Date, default: Date.now },
-  },
-  { _id: false }
-);
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
 
-const StoreSchema = new Schema(
-  {
-    name: { type: String, required: true, trim: true, maxlength: 120 },
-    slug: { type: String, required: true, unique: true, index: true, lowercase: true },
-    description: { type: String, maxlength: 2000 },
-    logoUrl: { type: String },
-    coverImageUrl: { type: String },
-    category: { type: String, index: true },
+function apiHeaders() {
+  const token = getSessionToken(); // من auth.js
+  return token ? { 'x-user-token': token } : {};
+}
 
-    // مالك المتجر — الحساب الوحيد صاحب الصلاحية الكاملة (تعديل بيانات المتجر،
-    // إضافة/إزالة مشرفين، حذف المتجر). لا يمكن نقل الملكية إلا عبر مسار إداري منفصل.
-    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+let currentStore = null;
+let viewerCanManage = false;
+let subscriptionInfo = null;
+let approvalStatus = null;
+let approvalReason = '';
 
-    // مشرفون معتمدون من المالك، صلاحياتهم أضيق (نشر/تعديل منتجات فقط)
-    admins: [StoreAdminSchema],
+async function loadStore() {
+  const root = document.getElementById('storeRoot');
+  root.innerHTML = '<p class="store-loading">جاري تحميل المتجر...</p>';
 
-    // شارة التوثيق: لا تُفعَّل إلا من لوحة تحكم إدارة سوقنا (Super Admin)
-    // وليس من المالك نفسه — تمنع أي متجر من "توثيق نفسه"
-    isVerified: { type: Boolean, default: false },
-    verifiedAt: { type: Date, default: null },
-    verifiedBy: { type: Schema.Types.ObjectId, ref: "User", default: null }, // مشرف سوقنا
+  try {
+    const res = await fetch(`/api/stores/${STORE_SLUG}`, { headers: apiHeaders() });
+    const data = await res.json();
+    if (!res.ok) {
+      root.innerHTML = `<p class="store-error">${escapeHtml(data.error || 'المتجر غير موجود')}</p>`;
+      return;
+    }
 
-    contact: {
-      whatsapp: { type: String, trim: true },
-      phone: { type: String, trim: true },
-      address: { type: String, trim: true },
-      location: {
-        lat: { type: Number },
-        lng: { type: Number },
-      },
-    },
+    currentStore = data.store;
+    viewerCanManage = !!data.viewerCanManage;
+    subscriptionInfo = data.subscription || null;
+    approvalStatus = data.approvalStatus || null;
+    approvalReason = data.approvalReason || '';
 
-    policies: {
-      warrantyText: { type: String, maxlength: 3000 },
-      returnPolicyText: { type: String, maxlength: 3000 },
-      warrantyPeriodDays: { type: Number, default: null },
-    },
+    renderStore();
+    loadProducts();
+  } catch (err) {
+    root.innerHTML = '<p class="store-error">تعذر الاتصال بالسيرفر</p>';
+  }
+}
 
-    isActive: { type: Boolean, default: true }, // تعطيل كامل للمتجر (إداري)
-  },
-  { timestamps: true }
-);
+function renderStore() {
+  const s = currentStore;
+  const root = document.getElementById('storeRoot');
 
-// فهرس نصي للبحث عن المتاجر
-StoreSchema.index({ name: "text", description: "text" });
+  root.innerHTML = `
+    <div class="store-cover" style="${
+      s.coverImageUrl ? `background-image:url('${s.coverImageUrl}')` : ''
+    }"></div>
 
-module.exports = mongoose.model("Store", StoreSchema);
+    <div class="store-header">
+      <div class="store-logo">
+        ${
+          s.logoUrl
+            ? `<img src="${s.logoUrl}" alt="${escapeHtml(s.name)}">`
+            : `<span>${escapeHtml(s.name).charAt(0)}</span>`
+        }
+      </div>
+      <div class="store-title-block">
+        <div class="store-title-row">
+          <h1>${escapeHtml(s.name)}</h1>
+          ${
+            s.isVerified
+              ? `<span class="store-badge-verified">✅ متجر موثّق</span>`
+              : ''
+          }
+        </div>
+        ${s.category ? `<p class="store-category">${escapeHtml(s.category)}</p>` : ''}
+      </div>
+      ${
+        viewerCanManage
+          ? `<div class="store-manage-actions">
+               <button id="addProductBtn" class="btn btn-primary store-manage-btn">➕ إنشاء منشور</button>
+               <button id="editStoreBtn" class="btn btn-ghost store-manage-btn">⚙️ تعديل بيانات المحل</button>
+             </div>`
+          : ''
+      }
+    </div>
+
+    ${s.description ? `<p class="store-description">${escapeHtml(s.description)}</p>` : ''}
+    ${renderApprovalBanner()}
+    ${renderSubscriptionBanner()}
+
+    <div class="store-section" id="storeContactSection"></div>
+    <div class="store-section" id="storeMapSection"></div>
+    <div class="store-section" id="storePolicySection"></div>
+    <div class="store-section" id="storeFilterSection"></div>
+    <div class="store-products-grid" id="storeProductsGrid"></div>
+  `;
+
+  renderContactInfo();
+  renderMap();
+  renderPolicyBox();
+  renderFilters();
+
+  if (viewerCanManage) {
+    document.getElementById('addProductBtn').addEventListener('click', openAddProductModal);
+    document.getElementById('editStoreBtn').addEventListener('click', openEditStoreModal);
+  }
+}
+
+// يظهر فقط لصاحب المحل/مشرفه، ينبّه لو محله لسا بانتظار المراجعة أو انرفض
+function renderApprovalBanner() {
+  if (!viewerCanManage || !approvalStatus || approvalStatus === 'approved') return '';
+  if (approvalStatus === 'pending') {
+    return `<div class="store-sub-banner store-sub-banner--warn">
+      ⏳ محلك بانتظار مراجعة إدارة سوقنا. ما رح يظهر للزوار ولا تقدر تنشر منشورات لحد ما توافق الإدارة عليه.
+    </div>`;
+  }
+  if (approvalStatus === 'rejected') {
+    return `<div class="store-sub-banner store-sub-banner--danger">
+      ❌ تم رفض طلب تسجيل محلك${approvalReason ? `: ${escapeHtml(approvalReason)}` : ''}. تواصل مع إدارة سوقنا للتفاصيل.
+    </div>`;
+  }
+  return '';
+}
+
+// يظهر فقط للمالك/المشرف، ينبّه قبل انتهاء الاشتراك أو بعده
+function renderSubscriptionBanner() {
+  if (!viewerCanManage || !subscriptionInfo) return '';
+  const { status, daysRemaining, monthlyFee } = subscriptionInfo;
+
+  if (status === 'expired') {
+    return `<div class="store-sub-banner store-sub-banner--danger">
+      ⏰ انتهى اشتراك المحل الشهري (${monthlyFee} د.أ). لازم تجدد عشان تقدر تنشر منتجات جديدة — تواصل مع إدارة سوقنا.
+    </div>`;
+  }
+  if (status === 'suspended') {
+    return `<div class="store-sub-banner store-sub-banner--danger">
+      ⛔ حساب المحل موقوف حالياً من إدارة سوقنا. تواصل معنا للتفاصيل.
+    </div>`;
+  }
+  if (daysRemaining <= 5) {
+    return `<div class="store-sub-banner store-sub-banner--warn">
+      ⚠️ اشتراك المحل بينتهي خلال ${daysRemaining} يوم. جدده لتفادي توقف النشر.
+    </div>`;
+  }
+  return '';
+}
+
+function renderContactInfo() {
+  const c = currentStore.contact || {};
+  const items = [];
+  if (c.whatsapp) {
+    items.push(
+      `<a class="store-contact-item" href="https://wa.me/${c.whatsapp.replace(/[^0-9]/g, '')}" target="_blank">
+        <span class="store-contact-icon">💬</span>
+        <span><span class="store-contact-label">واتساب</span><span class="store-contact-value">${escapeHtml(c.whatsapp)}</span></span>
+      </a>`
+    );
+  }
+  if (c.phone) {
+    items.push(
+      `<a class="store-contact-item" href="tel:${c.phone}">
+        <span class="store-contact-icon">📞</span>
+        <span><span class="store-contact-label">اتصال</span><span class="store-contact-value">${escapeHtml(c.phone)}</span></span>
+      </a>`
+    );
+  }
+  if (c.address) {
+    const href = c.location
+      ? `https://www.google.com/maps?q=${c.location.lat},${c.location.lng}`
+      : '#';
+    items.push(
+      `<a class="store-contact-item" href="${href}" target="_blank">
+        <span class="store-contact-icon">📍</span>
+        <span><span class="store-contact-label">الموقع</span><span class="store-contact-value">${escapeHtml(c.address)}</span></span>
+      </a>`
+    );
+  }
+
+  const section = document.getElementById('storeContactSection');
+  section.innerHTML = items.length
+    ? `<h2 class="store-section-title">تواصل مع المتجر</h2><div class="store-contact-grid">${items.join('')}</div>`
+    : '';
+}
+
+function renderMap() {
+  const section = document.getElementById('storeMapSection');
+  const loc = currentStore.contact && currentStore.contact.location;
+  if (!loc || !loc.lat || !loc.lng) {
+    section.innerHTML = '';
+    return;
+  }
+  section.innerHTML = `
+    <h2 class="store-section-title">موقع المحل على الخريطة</h2>
+    <div class="store-map-frame">
+      <iframe
+        src="https://www.google.com/maps?q=${loc.lat},${loc.lng}&output=embed"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+    </div>
+  `;
+}
+
+function renderPolicyBox() {
+  const p = currentStore.policies || {};
+  const section = document.getElementById('storePolicySection');
+  if (!p.warrantyText && !p.returnPolicyText) {
+    section.innerHTML = '';
+    return;
+  }
+  section.innerHTML = `
+    <div class="store-policy-box">
+      <h2 class="store-section-title store-section-title--light">سياسات الكفالة والاسترجاع</h2>
+      <div class="store-policy-grid">
+        ${
+          p.warrantyText
+            ? `<div class="store-policy-card">
+                <div class="store-policy-card-head">🛡️ الكفالة ${p.warrantyPeriodDays ? `<span>${p.warrantyPeriodDays} يوم</span>` : ''}</div>
+                <p>${escapeHtml(p.warrantyText)}</p>
+              </div>`
+            : ''
+        }
+        ${
+          p.returnPolicyText
+            ? `<div class="store-policy-card">
+                <div class="store-policy-card-head">↩️ سياسة الاسترجاع</div>
+                <p>${escapeHtml(p.returnPolicyText)}</p>
+              </div>`
+            : ''
+        }
+      </div>
+    </div>
+  `;
+}
+
+let activeFilters = { sortBy: 'newest' };
+let currentProducts = [];
+
+function renderFilters() {
+  const section = document.getElementById('storeFilterSection');
+  section.innerHTML = `
+    <div class="store-filter-bar">
+      <input id="storeSearchInput" type="text" placeholder="ابحث ضمن منتجات هذا المتجر..." class="store-input">
+      <select id="storeSortSelect" class="store-input">
+        <option value="newest">الأحدث</option>
+        <option value="price_asc">السعر: من الأقل</option>
+        <option value="price_desc">السعر: من الأعلى</option>
+        <option value="popular">الأكثر مشاهدة</option>
+      </select>
+    </div>
+  `;
+
+  document.getElementById('storeSearchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      activeFilters.q = e.target.value;
+      loadProducts();
+    }
+  });
+  document.getElementById('storeSortSelect').addEventListener('change', (e) => {
+    activeFilters.sortBy = e.target.value;
+    loadProducts();
+  });
+}
+
+async function loadProducts() {
+  const grid = document.getElementById('storeProductsGrid');
+  grid.innerHTML = '<p class="store-loading">جاري تحميل المنتجات...</p>';
+
+  const params = new URLSearchParams();
+  if (activeFilters.q) params.set('q', activeFilters.q);
+  if (activeFilters.sortBy) params.set('sortBy', activeFilters.sortBy);
+
+  // ملاحظة: لا يوجد أي storeId هنا — المسار (STORE_SLUG) وحده يحدد المتجر بالسيرفر
+  const res = await fetch(`/api/stores/${STORE_SLUG}/products?${params}`);
+  const data = await res.json();
+  const products = data.products || [];
+  currentProducts = products;
+
+  if (products.length === 0) {
+    grid.innerHTML = '<p class="store-empty">لا توجد منتجات تطابق البحث حالياً</p>';
+    return;
+  }
+
+  grid.innerHTML = products
+    .map(
+      (p) => `
+    <div class="store-product-card" data-id="${p._id}">
+      <div class="store-product-img">${p.images && p.images[0] ? `<img src="${p.images[0]}" alt="${escapeHtml(p.title)}">` : ''}</div>
+      <div class="store-product-body">
+        <h3>${escapeHtml(p.title)}</h3>
+        <p class="store-product-price">${p.price} د.أ</p>
+        ${
+          viewerCanManage
+            ? `<div class="store-product-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openEditProductModal('${p._id}')">✏️ تعديل</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteStoreProduct('${p._id}')">🗑️ حذف</button>
+              </div>`
+            : ''
+        }
+      </div>
+    </div>`
+    )
+    .join('');
+}
+
+async function deleteStoreProduct(productId) {
+  if (!confirm('هل تريد حذف هذا المنتج؟')) return;
+  const res = await fetch(`/api/stores/${STORE_SLUG}/products/${productId}`, {
+    method: 'DELETE',
+    headers: apiHeaders(),
+  });
+  if (res.ok) loadProducts();
+  else {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'تعذر حذف المنتج');
+  }
+}
+
+function openEditProductModal(productId) {
+  const product = currentProducts.find((p) => p._id === productId);
+  if (!product) return;
+
+  const existing = document.getElementById('sooqnaModalRoot');
+  if (existing) existing.remove();
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'sooqnaModalRoot';
+  wrapper.innerHTML = `
+    <div class="ms-modal-overlay">
+      <div class="ms-modal-box">
+        <div class="ms-modal-head">
+          <h2>✏️ تعديل المنشور</h2>
+          <button class="ms-modal-close" id="epClose">✕</button>
+        </div>
+        <div id="epMsg"></div>
+        <input id="epTitle" class="ms-input" value="${escapeHtml(product.title)}">
+        <input id="epPrice" type="number" class="ms-input" value="${product.price}">
+        <input id="epCategory" class="ms-input" value="${escapeHtml(product.category || '')}">
+        <textarea id="epDesc" class="ms-input" rows="3">${escapeHtml(product.description || '')}</textarea>
+        <button id="epSubmit" class="btn btn-primary">حفظ التعديل</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrapper);
+
+  document.getElementById('epClose').addEventListener('click', () => wrapper.remove());
+  document.getElementById('epSubmit').addEventListener('click', async () => {
+    const msg = document.getElementById('epMsg');
+    const title = document.getElementById('epTitle').value.trim();
+    const price = Number(document.getElementById('epPrice').value);
+    const category = document.getElementById('epCategory').value.trim();
+    const description = document.getElementById('epDesc').value.trim();
+
+    msg.innerHTML = '<p class="ms-loading">جاري الحفظ...</p>';
+    try {
+      const res = await fetch(`/api/stores/${STORE_SLUG}/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ title, price, category, description }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        msg.innerHTML = `<p class="ms-error">${escapeHtml(data.error || 'تعذر الحفظ')}</p>`;
+        return;
+      }
+      wrapper.remove();
+      loadProducts();
+    } catch (err) {
+      msg.innerHTML = '<p class="ms-error">تعذر الاتصال بالسيرفر</p>';
+    }
+  });
+}
+
+function openAddProductModal() {
+  const existing = document.getElementById('sooqnaModalRoot');
+  if (existing) existing.remove();
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'sooqnaModalRoot';
+  wrapper.innerHTML = `
+    <div class="ms-modal-overlay">
+      <div class="ms-modal-box">
+        <div class="ms-modal-head">
+          <h2>➕ إنشاء منشور جديد</h2>
+          <button class="ms-modal-close" id="apClose">✕</button>
+        </div>
+        <div id="apMsg"></div>
+        <input id="apTitle" class="ms-input" placeholder="اسم المنتج / المنشور">
+        <input id="apPrice" type="number" class="ms-input" placeholder="السعر (د.أ)">
+        <input id="apCategory" class="ms-input" placeholder="الفئة (اختياري)">
+        <textarea id="apDesc" class="ms-input" rows="3" placeholder="الوصف"></textarea>
+        <button id="apSubmit" class="btn btn-primary">نشر</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrapper);
+
+  document.getElementById('apClose').addEventListener('click', () => wrapper.remove());
+  document.getElementById('apSubmit').addEventListener('click', async () => {
+    const msg = document.getElementById('apMsg');
+    const title = document.getElementById('apTitle').value.trim();
+    const price = Number(document.getElementById('apPrice').value);
+    const category = document.getElementById('apCategory').value.trim();
+    const description = document.getElementById('apDesc').value.trim();
+
+    if (!title || !price) {
+      msg.innerHTML = '<p class="ms-error">اسم المنشور والسعر مطلوبين</p>';
+      return;
+    }
+
+    msg.innerHTML = '<p class="ms-loading">جاري النشر...</p>';
+    try {
+      const res = await fetch(`/api/stores/${STORE_SLUG}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ title, price, category, description }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        msg.innerHTML = `<p class="ms-error">${escapeHtml(data.error || 'تعذر النشر')}</p>`;
+        return;
+      }
+      wrapper.remove();
+      loadProducts();
+    } catch (err) {
+      msg.innerHTML = '<p class="ms-error">تعذر الاتصال بالسيرفر</p>';
+    }
+  });
+}
+
+function openEditStoreModal() {
+  const existing = document.getElementById('sooqnaModalRoot');
+  if (existing) existing.remove();
+
+  const c = currentStore.contact || {};
+  const p = currentStore.policies || {};
+  const loc = c.location || {};
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'sooqnaModalRoot';
+  wrapper.innerHTML = `
+    <div class="ms-modal-overlay">
+      <div class="ms-modal-box">
+        <div class="ms-modal-head">
+          <h2>⚙️ تعديل بيانات المحل</h2>
+          <button class="ms-modal-close" id="esClose">✕</button>
+        </div>
+        <div id="esMsg"></div>
+
+        <p class="ms-input-label">واتساب</p>
+        <input id="esWhatsapp" class="ms-input" value="${escapeHtml(c.whatsapp || '')}" placeholder="9627xxxxxxxx">
+
+        <p class="ms-input-label">رقم الهاتف</p>
+        <input id="esPhone" class="ms-input" value="${escapeHtml(c.phone || '')}" placeholder="07xxxxxxxx">
+
+        <p class="ms-input-label">العنوان (نص)</p>
+        <input id="esAddress" class="ms-input" value="${escapeHtml(c.address || '')}" placeholder="عمّان، الأردن">
+
+        <p class="ms-input-label">موقع المحل على خرائط جوجل</p>
+        <p class="ms-hint" style="text-align:right;margin:0 0 6px">
+          افتح خرائط جوجل، دوس مطولاً على مكان محلك بالضبط، وانسخ الإحداثيات (رقمين مفصولين بفاصلة) والصقهم هون:
+        </p>
+        <input id="esCoords" class="ms-input" placeholder="مثال: 31.9539, 35.9106">
+
+        <p class="ms-input-label">نص الكفالة</p>
+        <textarea id="esWarranty" class="ms-input" rows="2">${escapeHtml(p.warrantyText || '')}</textarea>
+
+        <p class="ms-input-label">مدة الكفالة (بالأيام)</p>
+        <input id="esWarrantyDays" type="number" class="ms-input" value="${p.warrantyPeriodDays || ''}">
+
+        <p class="ms-input-label">سياسة الاسترجاع</p>
+        <textarea id="esReturn" class="ms-input" rows="2">${escapeHtml(p.returnPolicyText || '')}</textarea>
+
+        <button id="esSubmit" class="btn btn-primary">حفظ التعديلات</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrapper);
+
+  document.getElementById('esClose').addEventListener('click', () => wrapper.remove());
+  document.getElementById('esSubmit').addEventListener('click', async () => {
+    const msg = document.getElementById('esMsg');
+    const coordsRaw = document.getElementById('esCoords').value.trim();
+    let lat, lng;
+    if (coordsRaw) {
+      const parts = coordsRaw.split(',').map((v) => Number(v.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        [lat, lng] = parts;
+      } else {
+        msg.innerHTML = '<p class="ms-error">صيغة الإحداثيات غير صحيحة، لازم تكون رقمين مفصولين بفاصلة</p>';
+        return;
+      }
+    } else if (loc.lat) {
+      lat = loc.lat;
+      lng = loc.lng;
+    }
+
+    const payload = {
+      whatsapp: document.getElementById('esWhatsapp').value.trim(),
+      phone: document.getElementById('esPhone').value.trim(),
+      address: document.getElementById('esAddress').value.trim(),
+      warrantyText: document.getElementById('esWarranty').value.trim(),
+      warrantyPeriodDays: Number(document.getElementById('esWarrantyDays').value) || null,
+      returnPolicyText: document.getElementById('esReturn').value.trim(),
+      ...(lat !== undefined ? { lat, lng } : {}),
+    };
+
+    msg.innerHTML = '<p class="ms-loading">جاري الحفظ...</p>';
+    try {
+      const res = await fetch(`/api/stores/${STORE_SLUG}/contact-and-policies`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        msg.innerHTML = `<p class="ms-error">${escapeHtml(data.error || 'تعذر الحفظ')}</p>`;
+        return;
+      }
+      wrapper.remove();
+      loadStore();
+    } catch (err) {
+      msg.innerHTML = '<p class="ms-error">تعذر الاتصال بالسيرفر</p>';
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!STORE_SLUG) {
+    document.getElementById('storeRoot').innerHTML =
+      '<p class="store-error">رابط المتجر غير صالح</p>';
+    return;
+  }
+  loadStore();
+});

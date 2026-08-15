@@ -76,7 +76,53 @@
 
 .store-category { font-size: 13px; color: #5A5A5A; margin: 4px 0 0; }
 
-.store-manage-btn { margin-right: auto; }
+.store-manage-btn { }
+.store-manage-actions { display: flex; gap: 8px; margin-right: auto; flex-wrap: wrap; }
+.store-manage-actions .btn { width: auto; }
+
+.store-map-frame {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--sooqna-border);
+  height: 220px;
+}
+.store-map-frame iframe { width: 100%; height: 100%; border: 0; }
+
+.ms-modal-overlay {
+  position: fixed; inset: 0; background: rgba(11,30,61,0.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 1000; direction: rtl;
+}
+.ms-modal-box {
+  background: #fff; width: 100%; max-width: 480px;
+  border-radius: 18px 18px 0 0; padding: 18px;
+  max-height: 88vh; overflow-y: auto;
+}
+.ms-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ms-modal-head h2 { font-size: 16px; color: var(--sooqna-navy); margin: 0; }
+.ms-modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #8A8168; }
+.ms-input {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--sooqna-border);
+  background: var(--sooqna-cream); border-radius: 10px; padding: 10px 12px;
+  font-size: 13px; margin-bottom: 10px; font-family: inherit;
+}
+.ms-input-label { font-size: 12px; color: #5A5A5A; margin: 0 0 4px; }
+.ms-loading, .ms-error { font-size: 12px; padding: 4px 0; }
+.ms-error { color: #C0392B; }
+.btn { border: none; border-radius: 10px; padding: 10px 16px; font-size: 13px; cursor: pointer; }
+.btn-primary { background: var(--sooqna-navy); color: #F8F4EA; width: 100%; }
+.btn-ghost { background: var(--sooqna-cream-2); color: var(--sooqna-navy); }
+
+.store-sub-banner {
+  margin: 16px 20px 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 700px;
+}
+.store-sub-banner--warn { background: #FFF4D6; color: #7A5B00; border: 1px solid #E7C948; }
+.store-sub-banner--danger { background: #FDE8E6; color: #A32C24; border: 1px solid #F0A79E; }
 
 .store-description {
   padding: 16px 20px 0;
