@@ -4,22 +4,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إدارة اشتراكات المحلات - سوقنا</title>
+  <title>لوحة إدارة سوقنا</title>
   <link rel="stylesheet" href="/style.css">
   <style>
     body { direction: rtl; font-family: 'Cairo', 'Tajawal', sans-serif; background: #FAF6EC; margin: 0; padding: 20px; }
-    h1 { color: #0B1E3D; font-size: 20px; }
+    h1 { color: #0B1E3D; font-size: 20px; margin-bottom: 4px; }
+    h2 { color: #0B1E3D; font-size: 16px; margin: 24px 0 10px; }
+    .loading, .empty, .error { font-size: 13px; color: #8A8168; padding: 10px 0; }
+    .error { color: #C0392B; }
+
+    .pending-card {
+      background: #fff; border: 1px solid #E7DCC0; border-radius: 12px;
+      padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between;
+      align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .pending-info b { display: block; font-size: 14px; color: #1A1A1A; }
+    .pending-info span { font-size: 12px; color: #8A8168; }
+    .pending-info p { font-size: 12px; color: #5A5A5A; margin: 4px 0 0; max-width: 320px; }
+    .pending-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
     .admin-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; }
     .admin-table th, .admin-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #E7DCC0; font-size: 13px; }
     .admin-table th { background: #0B1E3D; color: #C9A227; }
     .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
     .btn { border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+    .btn-sm { font-size: 11px; padding: 5px 8px; }
     .btn-primary { background: #0B1E3D; color: #F8F4EA; }
     .btn-ghost { background: #F0E9D6; color: #0B1E3D; }
+    .btn-approve { background: #1E7A3A; color: #fff; }
+    .btn-reject { background: #A32C24; color: #fff; }
+    .btn-view { background: #F0E9D6; color: #0B1E3D; text-decoration: none; display: inline-flex; align-items: center; }
+    .btn-feature { background: #C9A227; color: #0B1E3D; }
+    .btn-danger { background: #A32C24; color: #fff; }
   </style>
 </head>
 <body>
-  <h1>إدارة اشتراكات المحلات</h1>
+  <h1>لوحة إدارة سوقنا</h1>
+
+  <h2>📥 طلبات تسجيل جديدة</h2>
+  <div id="adminPendingRoot"></div>
+
+  <h2>🏬 كل المحلات والاشتراكات</h2>
   <div id="adminStoresRoot"></div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
