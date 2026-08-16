@@ -145,7 +145,6 @@ typeToggle.addEventListener('change', () => {
   const selected = typeToggle.querySelector('input[name="type"]:checked');
   const isFound = selected && selected.value === 'found';
   verificationField.style.display = isFound ? 'block' : 'none';
-  verificationField.querySelector('input').required = isFound;
 });
 
 // ---------- الإحصائيات ----------
