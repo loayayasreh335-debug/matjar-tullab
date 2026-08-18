@@ -14,7 +14,6 @@ const LOSTFOUND_CATEGORIES = [
 
 const LF_TYPES = ['lost', 'found']; // ضاع مني / وجدت إشي
 const LF_DAILY_POST_LIMIT = 5;
-const LF_MAX_CLAIM_ATTEMPTS = 5; // كحد أقصى لمحاولات إجابة سؤال التحقق كل ساعة
 
 module.exports = function registerLostFoundRoutes(app, deps) {
   const {
@@ -51,15 +50,12 @@ module.exports = function registerLostFoundRoutes(app, deps) {
 
   // ---------- تجهيز العنصر للعرض العام (إخفاء الحقول الحساسة) ----------
   function toPublicLostFound(item) {
-    const { ownerToken, imagePublicIds, verificationAnswer, _id, whatsapp, ...rest } = item;
+    const { ownerToken, imagePublicIds, _id, whatsapp, ...rest } = item;
     const publicItem = { ...rest };
-    publicItem.requiresVerification = item.type === 'found' && !item.isResolved;
 
     // إعلانات "ضاع مني" يظهر فيها رقم التواصل مباشرة (صاحبها هو من يحتاج يوصل له الناس)
     // إعلانات "وجدت إشي" لا يظهر فيها رقم التواصل إلا بعد اجتياز سؤال التحقق
-    if (item.type === 'lost') {
-      publicItem.whatsapp = whatsapp;
-    }
+    publicItem.whatsapp = whatsapp;
     return publicItem;
   }
 
@@ -112,7 +108,7 @@ module.exports = function registerLostFoundRoutes(app, deps) {
         return res.status(429).json({ error: `وصلت للحد الأقصى (${LF_DAILY_POST_LIMIT} منشورات) خلال 24 ساعة. حاول مرة أخرى لاحقاً.` });
       }
 
-      const { type, name, description, category, governorate, area, whatsapp, verificationAnswer } = req.body;
+      const { type, name, description, category, governorate, area, whatsapp } = req.body;
 
       if (!LF_TYPES.includes(type)) {
         return res.status(400).json({ error: 'يرجى تحديد الحالة: ضاع مني أو وجدت إشي' });

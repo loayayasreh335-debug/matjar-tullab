@@ -20,17 +20,10 @@ const areaSelect = document.getElementById('areaSelect');
 const typeToggle = document.getElementById('typeToggle');
 const verificationField = document.getElementById('verificationField');
 
-const claimOverlay = document.getElementById('claimOverlay');
-const closeClaimBtn = document.getElementById('closeClaimBtn');
-const claimForm = document.getElementById('claimForm');
-const claimAnswerInput = document.getElementById('claimAnswerInput');
-const claimError = document.getElementById('claimError');
-const claimSuccess = document.getElementById('claimSuccess');
 
 const themeToggleBtn = document.getElementById('themeToggleBtn');
 
 let jordanLocations = {};
-let currentClaimItemId = null;
 
 // ---------- الوضع الليلي / الفاتح (نفس مفتاح التخزين المستخدم بالصفحة الرئيسية) ----------
 const THEME_KEY = 'matjarTullab_theme';
@@ -185,10 +178,8 @@ function renderCard(item) {
   let contactHtml = '';
   if (item.isResolved) {
     contactHtml = '';
-  } else if (item.type === 'lost') {
-    contactHtml = `<a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(item.whatsapp, item.name)}">💬 تواصل عبر واتساب</a>`;
   } else {
-    contactHtml = `<button class="btn btn-primary btn-block claim-btn" data-id="${item.id}">🔒 أنا صاحب الغرض</button>`;
+    contactHtml = `<a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(item.whatsapp, item.name)}">💬 تواصل عبر واتساب</a>`;
   }
 
   const ownerActionsHtml = isOwner
@@ -219,9 +210,6 @@ function renderCard(item) {
       ${ownerActionsHtml}
     </div>
   `;
-
-  const claimBtn = card.querySelector('.claim-btn');
-  if (claimBtn) claimBtn.addEventListener('click', () => openClaimModal(item.id));
 
   const swapBtn = card.querySelector('.btn-swap');
   if (swapBtn) swapBtn.addEventListener('click', () => toggleResolved(item.id, myToken));
@@ -309,44 +297,6 @@ async function toggleResolved(id, ownerToken) {
 }
 
 // ---------- نافذة سؤال التحقق ----------
-function openClaimModal(itemId) {
-  currentClaimItemId = itemId;
-  claimAnswerInput.value = '';
-  claimError.textContent = '';
-  claimSuccess.style.display = 'none';
-  claimForm.style.display = 'block';
-  claimOverlay.classList.add('active');
-}
-closeClaimBtn.addEventListener('click', () => claimOverlay.classList.remove('active'));
-claimOverlay.addEventListener('click', (e) => { if (e.target === claimOverlay) claimOverlay.classList.remove('active'); });
-
-claimForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  claimError.textContent = '';
-
-  try {
-    const res = await fetch(`/api/lostfound/${currentClaimItemId}/claim`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-device-id': getDeviceId() },
-      body: JSON.stringify({ answer: claimAnswerInput.value })
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      claimError.textContent = data.error || 'حدث خطأ، حاول مرة أخرى';
-      return;
-    }
-
-    claimForm.style.display = 'none';
-    claimSuccess.style.display = 'block';
-    claimSuccess.innerHTML = `
-      <p class="support-text">✅ تم التحقق بنجاح! تواصل مباشرة مع الشخص:</p>
-      <a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(data.whatsapp, data.name)}">💬 تواصل عبر واتساب</a>
-    `;
-  } catch (err) {
-    claimError.textContent = 'تعذر الاتصال بالسيرفر';
-  }
-});
 
 // ---------- بدء التشغيل ----------
 loadCategories();
