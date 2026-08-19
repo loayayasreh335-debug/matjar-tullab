@@ -10,6 +10,36 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function buildWhatsappLink(number, itemName) {
+  const message = encodeURIComponent(`مرحباً، أنا مهتم بمنتج "${itemName}" في متجركم.`);
+  return `https://wa.me/${number}?text=${message}`;
+}
+
+function buildStoreLink() {
+  return `${window.location.origin}/store.html?slug=${STORE_SLUG}`;
+}
+
+async function shareStoreProduct(item) {
+  const url = buildStoreLink();
+  const text = `شوف "${item.title}" بمتجر ${currentStore.name} على سوقنا`;
+  if (navigator.share) {
+    try { await navigator.share({ title: item.title, text, url }); } catch (e) {}
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+  }
+}
+
+async function copyStoreProductLink(btnEl) {
+  try {
+    await navigator.clipboard.writeText(buildStoreLink());
+    const original = btnEl.textContent;
+    btnEl.textContent = '✅ تم النسخ';
+    setTimeout(() => (btnEl.textContent = original), 1500);
+  } catch (e) {
+    alert('تعذر نسخ الرابط');
+  }
+}
+
 function apiHeaders() {
   const token = getSessionToken(); // من auth.js
   return token ? { 'x-user-token': token } : {};
@@ -290,6 +320,20 @@ async function loadProducts() {
         <h3>${escapeHtml(p.title)}</h3>
         <p class="store-product-price">${p.price} د.أ</p>
         ${
+          !p.isSoldOut && currentStore.contact && currentStore.contact.whatsapp
+            ? `<a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(currentStore.contact.whatsapp, p.title)}">💬 تواصل عبر واتساب</a>`
+            : ''
+        }
+        ${
+          !p.isSoldOut && currentStore.ownerUid
+            ? `<button class="btn-chat" onclick="openStoreProductChat('${p._id}', '${encodeURIComponent(p.title)}')">💬 محادثة</button>`
+            : ''
+        }
+        <div class="store-product-share-row">
+          <button class="btn-share" data-id="${p._id}">🔗 مشاركة</button>
+          <button class="btn-copy-link" data-id="${p._id}">📋 نسخ الرابط</button>
+        </div>
+        ${
           viewerCanManage
             ? `<div class="store-product-actions">
                 <button class="btn btn-ghost btn-sm" onclick="openEditProductModal('${p._id}')">✏️ تعديل</button>
@@ -301,6 +345,23 @@ async function loadProducts() {
     </div>`
     )
     .join('');
+
+  grid.querySelectorAll('.btn-share').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const product = currentProducts.find((p) => p._id === btn.dataset.id);
+      if (product) shareStoreProduct(product);
+    });
+  });
+  grid.querySelectorAll('.btn-copy-link').forEach((btn) => {
+    btn.addEventListener('click', () => copyStoreProductLink(btn));
+  });
+}
+
+function openStoreProductChat(productId, encodedTitle) {
+  if (!currentStore || !currentStore.ownerUid) return;
+  const product = currentProducts.find((p) => p._id === productId);
+  const itemName = product ? product.title : decodeURIComponent(encodedTitle);
+  startChatWith({ itemType: 'store_product', itemId: productId, itemName, otherUid: currentStore.ownerUid });
 }
 
 async function deleteStoreProduct(productId) {

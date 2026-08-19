@@ -318,6 +318,7 @@ module.exports = function registerStoreRoutes(app, deps) {
       res.json({
         store: {
           id: store._id,
+          ownerUid: store.ownerUid,
           name: store.name,
           slug: store.slug,
           description: store.description,
