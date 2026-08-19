@@ -508,6 +508,29 @@ app.get('/item/:id', async (req, res) => {
   }
 });
 
+app.get('/lostfound/:id', async (req, res) => {
+  try {
+    const item = await db.collection('lostfound').findOne({ id: req.params.id });
+    const baseHtml = fs.readFileSync(path.join(__dirname, 'public', 'lostfound.html'), 'utf-8');
+    if (!item) return res.send(baseHtml);
+
+    const fullUrl = `${req.protocol}://${req.get('host')}/lostfound/${item.id}`;
+    const imageUrl = item.imageUrls && item.imageUrls[0] ? item.imageUrls[0] : '';
+    const typeLabel = item.type === 'lost' ? 'فقدت' : 'وجدت';
+
+    const html = injectOgTags(baseHtml, {
+      title: `${typeLabel}: ${item.name} | سوقنا`,
+      description: `${item.description}`.slice(0, 200),
+      image: imageUrl,
+      url: fullUrl
+    });
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.sendFile(path.join(__dirname, 'public', 'lostfound.html'));
+  }
+});
+
 app.get('/university/:name', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

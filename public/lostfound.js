@@ -214,6 +214,12 @@ function renderCard(item) {
   const swapBtn = card.querySelector('.btn-swap');
   if (swapBtn) swapBtn.addEventListener('click', () => toggleResolved(item.id, myToken));
 
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('a, button')) return;
+    window.history.pushState({}, '', '/lostfound/' + item.id);
+    lfShowDetailView(item.id);
+  });
+
   return card;
 }
 
@@ -302,4 +308,184 @@ async function toggleResolved(id, ownerToken) {
 loadCategories();
 loadLocations();
 loadStats();
-loadItems();
+lfHandleRouting();
+
+// ---------- نافذة التفاصيل ----------
+const lfHomeView = document.getElementById('lfHomeView');
+const lfDetailView = document.getElementById('lfDetailView');
+
+function lfShowHomeView() {
+  lfHomeView.style.display = '';
+  lfDetailView.style.display = 'none';
+}
+
+function lfShowDetailView(itemId) {
+  lfHomeView.style.display = 'none';
+  lfDetailView.style.display = 'block';
+  lfLoadItemDetail(itemId);
+}
+
+function lfHandleRouting() {
+  const m = window.location.pathname.match(/^\/lostfound\/(.+)$/);
+  if (m) {
+    lfShowDetailView(decodeURIComponent(m[1]));
+  } else {
+    lfShowHomeView();
+  }
+}
+
+window.addEventListener('popstate', lfHandleRouting);
+async function lfLoadItemDetail(itemId) {
+  try {
+    const res = await fetch(`/api/lostfound/${itemId}`);
+    const data = await res.json();
+    if (!res.ok) {
+      lfDetailView.innerHTML = `
+        <button class="btn-ghost" id="lfBackBtn">→ رجوع لكل المفقودات والموجودات</button>
+        <div class="empty-state"><p>${escapeHtml(data.error || 'العنصر غير موجود')}</p></div>
+      `;
+      document.getElementById('lfBackBtn').addEventListener('click', () => {
+        window.history.pushState({}, '', '/lostfound.html');
+        lfShowHomeView();
+      });
+      return;
+    }
+    lfRenderItemDetail(data);
+  } catch (err) {
+    console.error('lfLoadItemDetail error:', err);
+  }
+}
+
+function lfRenderItemDetail(item) {
+  const ownerTokens = getOwnerTokens();
+  const myToken = ownerTokens[item.id];
+  const isOwner = Boolean(myToken);
+  const images = (item.imageUrls && item.imageUrls.length) ? item.imageUrls : [null];
+
+  const mainImageHtml = images[0]
+    ? `<img class="detail-main-image" id="lfDetailMainImage" src="${images[0]}" alt="${escapeHtml(item.name)}">`
+    : `<div class="detail-main-image placeholder" id="lfDetailMainImage">📦</div>`;
+
+  const dotsHtml = images.length > 1
+    ? `<div class="detail-dots">${images.map((img, i) =>
+        `<button class="detail-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></button>`).join('')}</div>`
+    : '';
+
+  const typeBadge = item.type === 'lost'
+    ? `<span class="card-category">🔍 فقدت إشي</span>`
+    : `<span class="card-category">🙋‍♂️ وجدت إشي</span>`;
+
+  const resolvedNote = item.isResolved
+    ? `<div class="card-trade" style="background:#fdecec; color:#c62828;">✅ تم الإرجاع لأصحابه ولم يعد متاحاً</div>`
+    : '';
+
+  let contactHtml = '';
+  if (item.isResolved) {
+    contactHtml = '';
+  } else {
+    contactHtml = `<a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(item.whatsapp, item.name)}">💬 تواصل عبر واتساب</a>`;
+  }
+
+  let chatBtnHtml = '';
+  if (!item.isResolved && item.ownerUid && !isOwner) {
+    chatBtnHtml = `<button class="btn-chat" onclick="lfOpenChat('${item.id}', '${encodeURIComponent(item.name)}', '${item.ownerUid}')">💬 محادثة</button>`;
+  }
+
+  const ownerActionsHtml = isOwner
+    ? `<div class="card-owner-actions">
+         <button class="btn-swap ${item.isResolved ? 'active' : ''}" id="lfDetailResolveBtn">
+           ${item.isResolved ? '↩️ إلغاء الإرجاع' : '✅ تم الإرجاع لأصحابه'}
+         </button>
+       </div>`
+    : '';
+
+  lfDetailView.innerHTML = `
+    <button class="btn-ghost" id="lfBackBtn">→ رجوع لكل المفقودات والموجودات</button>
+    <div class="item-detail">
+      <div class="detail-gallery">
+        ${mainImageHtml}
+        ${dotsHtml}
+      </div>
+      <div class="detail-body">
+        <div class="card-badges-row">
+          ${typeBadge}
+          <span class="card-category">📍 ${escapeHtml(item.area)}</span>
+          <span class="card-category">🏷️ ${escapeHtml(item.category)}</span>
+        </div>
+        <h1 class="detail-title">${escapeHtml(item.name)}</h1>
+        <p class="detail-desc">${escapeHtml(item.description)}</p>
+        ${resolvedNote}
+        <div class="detail-meta">
+          <span>🕒 ${formatRelativeTime(item.createdAt)}</span>
+        </div>
+        <div class="card-actions-row">
+          ${contactHtml}
+          ${chatBtnHtml}
+          <button class="btn-share" id="lfDetailShareBtn">🔗 مشاركة</button>
+          <button class="btn-copy-link" id="lfDetailCopyLinkBtn">📋 نسخ الرابط</button>
+        </div>
+        ${ownerActionsHtml}
+      </div>
+    </div>
+  `;
+
+  const dotButtons = lfDetailView.querySelectorAll('.detail-dot');
+  const mainImageEl = document.getElementById('lfDetailMainImage');
+  dotButtons.forEach(dot => {
+    dot.addEventListener('click', () => {
+      const idx = parseInt(dot.dataset.index, 10);
+      if (mainImageEl.tagName === 'IMG') mainImageEl.src = images[idx];
+      dotButtons.forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+    });
+  });
+
+  document.getElementById('lfBackBtn').addEventListener('click', () => {
+    window.history.pushState({}, '', '/lostfound.html');
+    lfShowHomeView();
+  });
+
+  document.getElementById('lfDetailShareBtn').addEventListener('click', () => lfShareItem(item));
+  const copyBtn = document.getElementById('lfDetailCopyLinkBtn');
+  copyBtn.addEventListener('click', () => lfCopyItemLink(item.id, copyBtn));
+
+  const resolveBtn = document.getElementById('lfDetailResolveBtn');
+  if (resolveBtn) {
+    resolveBtn.addEventListener('click', async () => {
+      try {
+        await toggleResolved(item.id, myToken);
+        lfLoadItemDetail(item.id);
+      } catch (err) {}
+    });
+  }
+}
+
+function lfOpenChat(itemId, encodedName, ownerUid) {
+  const itemName = decodeURIComponent(encodedName);
+  startChatWith({ itemType: 'lostfound', itemId, itemName, otherUid: ownerUid });
+}
+
+function lfBuildItemUrl(itemId) {
+  return `${window.location.origin}/lostfound/${itemId}`;
+}
+
+async function lfShareItem(item) {
+  const url = lfBuildItemUrl(item.id);
+  const text = `${item.name} - على سوقنا`;
+  if (navigator.share) {
+    try { await navigator.share({ title: item.name, text, url }); } catch (e) {}
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+  }
+}
+
+async function lfCopyItemLink(itemId, btnEl) {
+  try {
+    await navigator.clipboard.writeText(lfBuildItemUrl(itemId));
+    const original = btnEl.textContent;
+    btnEl.textContent = '✅ تم النسخ';
+    setTimeout(() => (btnEl.textContent = original), 1500);
+  } catch (e) {
+    alert('تعذر نسخ الرابط');
+  }
+}

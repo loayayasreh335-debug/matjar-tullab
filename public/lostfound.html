@@ -26,6 +26,7 @@
     </div>
   </header>
 
+  <div id="lfHomeView">
   <section class="hero">
     <h1>المفقودات والموجودات بالمملكة</h1>
     <p>ضاع منك إشي؟ أو لقيت غرض حدا فاقده؟ ساعد نفسك وساعد غيرك تلاقوا أغراضكم</p>
@@ -55,6 +56,8 @@
       لا يوجد منشورات مطابقة حالياً — كن أول من ينشر 🙌
     </div>
   </main>
+  </div>
+  <div id="lfDetailView" style="display:none;"></div>
 
   <button id="openFormBtn" class="btn btn-primary lf-fab">+ أضف منشور</button>
 
@@ -113,11 +116,7 @@
         </label>
 
         <div id="verificationField" style="display:none;">
-          <label>
-            علامة فارقة (تُستخدم للتحقق من صاحب الغرض الحقيقي)
-            <input type="text" name="verificationAnswer" placeholder="مثال: فيها كرت جامعي باسم...">
-          </label>
-          <p class="lf-hint">⚠️ هاي المعلومة سرية ولا تظهر للعامة — رح تُستخدم لسؤال أي حدا يدّعي إنه صاحب الغرض قبل ما نعطيه رقم تواصلك.</p>
+          <p class="lf-hint">💡 نصيحة: قبل ما تسلّم الغرض لأي حدا، اسأله عن علامة فارقة فيه (لون، محتويات، عيب معيّن...) للتأكد إنه صاحبه الحقيقي.</p>
         </div>
 
         <label>
@@ -138,22 +137,14 @@
   </div>
 
   <!-- نافذة سؤال التحقق -->
-  <div id="claimOverlay" class="overlay">
-    <div class="modal">
-      <div class="modal-header">
-        <h2>تأكيد الملكية 🔒</h2>
-        <button id="closeClaimBtn" class="btn-close">✕</button>
-      </div>
-      <p class="support-text">لإثبات إنك صاحب الغرض الحقيقي، جاوب على سؤال التحقق اللي حدده الناشر:</p>
-      <form id="claimForm">
-        <input type="text" id="claimAnswerInput" placeholder="إجابتك هنا" required style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--input-bg);color:var(--text-dark);">
-        <div id="claimError" class="form-error"></div>
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px;">تأكيد</button>
-      </form>
-      <div id="claimSuccess" style="display:none;text-align:center;margin-top:14px;"></div>
-    </div>
+  
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="chat.js"></script>
   <script src="lostfound.js"></script>
 </body>
 </html>
