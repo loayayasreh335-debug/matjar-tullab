@@ -70,7 +70,8 @@ async function loadStore() {
     approvalReason = data.approvalReason || '';
 
     renderStore();
-    loadProducts();
+    await loadProducts();
+    storeHandleRouting();
   } catch (err) {
     root.innerHTML = '<p class="store-error">تعذر الاتصال بالسيرفر</p>';
   }
@@ -81,6 +82,7 @@ function renderStore() {
   const root = document.getElementById('storeRoot');
 
   root.innerHTML = `
+    <div id="storeHomeContent">
     <div class="store-cover" style="${
       s.coverImageUrl ? `background-image:url('${s.coverImageUrl}')` : ''
     }"></div>
@@ -123,6 +125,8 @@ function renderStore() {
     <div class="store-section" id="storePolicySection"></div>
     <div class="store-section" id="storeFilterSection"></div>
     <div class="store-products-grid" id="storeProductsGrid"></div>
+    </div>
+    <div id="storeDetailView" style="display:none;"></div>
   `;
 
   renderContactInfo();
@@ -345,6 +349,15 @@ async function loadProducts() {
     </div>`
     )
     .join('');
+
+  grid.querySelectorAll('.store-product-card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('a, button')) return;
+      const productId = card.dataset.id;
+      window.history.pushState({}, '', `/store.html?slug=${STORE_SLUG}&product=${productId}`);
+      storeShowDetailView(productId);
+    });
+  });
 
   grid.querySelectorAll('.btn-share').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -635,6 +648,125 @@ function openEditStoreModal() {
       msg.innerHTML = '<p class="ms-error">تعذر الاتصال بالسيرفر</p>';
     }
   });
+}
+
+// ---------- نافذة تفاصيل المنتج ----------
+function storeBuildProductUrl(productId) {
+  return `${window.location.origin}/store.html?slug=${STORE_SLUG}&product=${productId}`;
+}
+
+function storeShowHomeView() {
+  document.getElementById('storeHomeContent').style.display = '';
+  document.getElementById('storeDetailView').style.display = 'none';
+}
+
+function storeShowDetailView(productId) {
+  const product = currentProducts.find((p) => p._id === productId);
+  if (!product) { storeShowHomeView(); return; }
+  document.getElementById('storeHomeContent').style.display = 'none';
+  const detailView = document.getElementById('storeDetailView');
+  detailView.style.display = 'block';
+  storeRenderProductDetail(product);
+}
+
+function storeHandleRouting() {
+  const productId = new URLSearchParams(window.location.search).get('product');
+  if (productId) {
+    storeShowDetailView(productId);
+  } else {
+    storeShowHomeView();
+  }
+}
+
+window.addEventListener('popstate', storeHandleRouting);
+function storeRenderProductDetail(product) {
+  const images = (product.images && product.images.length) ? product.images : [null];
+
+  const mainImageHtml = images[0]
+    ? `<img class="detail-main-image" id="storeDetailMainImage" src="${images[0]}" alt="${escapeHtml(product.title)}">`
+    : `<div class="detail-main-image placeholder" id="storeDetailMainImage">📦</div>`;
+
+  const dotsHtml = images.length > 1
+    ? `<div class="detail-dots">${images.map((img, i) =>
+        `<button class="detail-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></button>`).join('')}</div>`
+    : '';
+
+  let contactHtml = '';
+  if (!product.isSoldOut && currentStore.contact && currentStore.contact.whatsapp) {
+    contactHtml = `<a class="btn-whatsapp" target="_blank" rel="noopener" href="${buildWhatsappLink(currentStore.contact.whatsapp, product.title)}">💬 تواصل عبر واتساب</a>`;
+  }
+
+  let chatBtnHtml = '';
+  if (!product.isSoldOut && currentStore.ownerUid) {
+    chatBtnHtml = `<button class="btn-chat" onclick="openStoreProductChat('${product._id}', '${encodeURIComponent(product.title)}')">💬 محادثة</button>`;
+  }
+
+  const soldOutBadge = product.isSoldOut
+    ? `<div class="card-trade" style="background:#fdecec; color:#c62828;">🚫 نفذت الكمية</div>`
+    : '';
+
+  const detailView = document.getElementById('storeDetailView');
+  detailView.innerHTML = `
+    <button class="btn-ghost" id="storeDetailBackBtn">→ رجوع لكل منتجات المتجر</button>
+    <div class="item-detail">
+      <div class="detail-gallery">
+        ${mainImageHtml}
+        ${dotsHtml}
+      </div>
+      <div class="detail-body">
+        <h1 class="detail-title">${escapeHtml(product.title)}</h1>
+        <p class="store-product-price">${product.price} د.أ</p>
+        ${soldOutBadge}
+        <div class="card-actions-row">
+          ${contactHtml}
+          ${chatBtnHtml}
+          <button class="btn-share" id="storeDetailShareBtn">🔗 مشاركة</button>
+          <button class="btn-copy-link" id="storeDetailCopyLinkBtn">📋 نسخ الرابط</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const dotButtons = detailView.querySelectorAll('.detail-dot');
+  const mainImageEl = document.getElementById('storeDetailMainImage');
+  dotButtons.forEach(dot => {
+    dot.addEventListener('click', () => {
+      const idx = parseInt(dot.dataset.index, 10);
+      if (mainImageEl.tagName === 'IMG') mainImageEl.src = images[idx];
+      dotButtons.forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+    });
+  });
+
+  document.getElementById('storeDetailBackBtn').addEventListener('click', () => {
+    window.history.pushState({}, '', `/store.html?slug=${STORE_SLUG}`);
+    storeShowHomeView();
+  });
+
+  document.getElementById('storeDetailShareBtn').addEventListener('click', () => storeShareProductDetail(product));
+  const copyBtn = document.getElementById('storeDetailCopyLinkBtn');
+  copyBtn.addEventListener('click', () => storeCopyProductDetailLink(product._id, copyBtn));
+}
+
+async function storeShareProductDetail(product) {
+  const url = storeBuildProductUrl(product._id);
+  const text = `${product.title} - في متجر ${currentStore.name} على سوقنا`;
+  if (navigator.share) {
+    try { await navigator.share({ title: product.title, text, url }); } catch (e) {}
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+  }
+}
+
+async function storeCopyProductDetailLink(productId, btnEl) {
+  try {
+    await navigator.clipboard.writeText(storeBuildProductUrl(productId));
+    const original = btnEl.textContent;
+    btnEl.textContent = '✅ تم النسخ';
+    setTimeout(() => (btnEl.textContent = original), 1500);
+  } catch (e) {
+    alert('تعذر نسخ الرابط');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
