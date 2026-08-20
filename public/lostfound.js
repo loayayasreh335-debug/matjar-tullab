@@ -310,6 +310,7 @@ const lfDetailView = document.getElementById('lfDetailView');
 function lfShowHomeView() {
   lfHomeView.style.display = '';
   lfDetailView.style.display = 'none';
+  loadItems();
 }
 
 function lfShowDetailView(itemId) {
