@@ -20,7 +20,6 @@ const areaSelect = document.getElementById('areaSelect');
 const typeToggle = document.getElementById('typeToggle');
 const verificationField = document.getElementById('verificationField');
 
-
 const themeToggleBtn = document.getElementById('themeToggleBtn');
 
 let jordanLocations = {};
@@ -304,12 +303,6 @@ async function toggleResolved(id, ownerToken) {
 
 // ---------- نافذة سؤال التحقق ----------
 
-// ---------- بدء التشغيل ----------
-loadCategories();
-loadLocations();
-loadStats();
-lfHandleRouting();
-
 // ---------- نافذة التفاصيل ----------
 const lfHomeView = document.getElementById('lfHomeView');
 const lfDetailView = document.getElementById('lfDetailView');
@@ -335,6 +328,13 @@ function lfHandleRouting() {
 }
 
 window.addEventListener('popstate', lfHandleRouting);
+
+// ---------- بدء التشغيل ----------
+loadCategories();
+loadLocations();
+loadStats();
+lfHandleRouting();
+
 async function lfLoadItemDetail(itemId) {
   try {
     const res = await fetch(`/api/lostfound/${itemId}`);
@@ -357,7 +357,7 @@ async function lfLoadItemDetail(itemId) {
 }
 
 function lfRenderItemDetail(item) {
-  const ownerTokens = getOwnerTokens();
+  const ownerTokens = getLfOwnerTokens();
   const myToken = ownerTokens[item.id];
   const isOwner = Boolean(myToken);
   const images = (item.imageUrls && item.imageUrls.length) ? item.imageUrls : [null];
