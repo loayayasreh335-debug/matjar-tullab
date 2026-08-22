@@ -722,6 +722,7 @@ function storeRenderProductDetail(product) {
           ${chatBtnHtml}
           <button class="btn-share" id="storeDetailShareBtn">🔗 مشاركة</button>
           <button class="btn-copy-link" id="storeDetailCopyLinkBtn">📋 نسخ الرابط</button>
+          ${viewerCanManage ? `<button class="btn btn-ghost" onclick="toggleProductSoldOut('${product._id}', ${!!product.isSoldOut})">${product.isSoldOut ? '↩️ إلغاء نفذت الكمية' : '🚫 نفذت الكمية'}</button>` : ''}
         </div>
       </div>
     </div>
